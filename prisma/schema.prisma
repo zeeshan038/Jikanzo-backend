@@ -16,6 +16,7 @@ enum Role {
 
 model User {
   id               Int               @id @default(autoincrement())
+  cloudflareId     String?           @unique
   username         String            @unique
   phone            String            @unique
   profileImage     String?           @default("")

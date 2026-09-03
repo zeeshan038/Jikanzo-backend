@@ -15,6 +15,7 @@ import {
 
 //Utils
 import { genrateToken } from '../../utils/methods';
+import { generateUniqueCloudflareId, ensureR2UserFolders } from '../../utils/cloudflare';
 
 
 /**
@@ -37,7 +38,7 @@ export const sendOtp = async (req: Request, res: Response): Promise<any> => {
     try {
         // Generate a 6-digit OTP
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 mins expiry
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000); 
 
         // Upsert OTP record
         await prisma.otp.upsert({
@@ -137,6 +138,7 @@ export const verifyOtp = async (req: Request, res: Response): Promise<any> => {
     }
 };
 
+
 /** 
  * @Description Register User
  * @Method POST api/user/register
@@ -191,8 +193,10 @@ export const registerUser = async (req: Request, res: Response): Promise<any> =>
         }
 
         // 3. Create the user
+        const cloudflareId = await generateUniqueCloudflareId();
         const role = payload.role || 'CLIENT';
         const userData: any = {
+            cloudflareId,
             username: payload.username,
             phone: payload.phone,
             role: role
@@ -206,6 +210,11 @@ export const registerUser = async (req: Request, res: Response): Promise<any> =>
 
         const newUser = await prisma.user.create({
             data: userData
+        });
+
+        // Create logical R2 folders for this user asynchronously
+        ensureR2UserFolders(cloudflareId).catch((err) => {
+            console.warn("[R2] ensureR2UserFolders failed:", err?.message || err);
         });
 
         // Optional: Clean up OTP record now that they are registered
@@ -234,7 +243,6 @@ export const registerUser = async (req: Request, res: Response): Promise<any> =>
 };
 
 
-
 /** 
  * @Description Login User
  * @Method POST api/user/login
@@ -253,7 +261,7 @@ export const loginUser = async (req: Request, res: Response): Promise<any> => {
     }
 
     try {
-        // 1. Find user by phone
+
         const user = await prisma.user.findUnique({
             where: { phone: payload.phone }
         });
@@ -265,7 +273,6 @@ export const loginUser = async (req: Request, res: Response): Promise<any> => {
             });
         }
 
-        // 2. Verify OTP
         const otpRecord = await prisma.otp.findUnique({
             where: { phone: payload.phone }
         });
@@ -291,10 +298,8 @@ export const loginUser = async (req: Request, res: Response): Promise<any> => {
             });
         }
 
-        // 3. OTP is valid! We can clean up the OTP record.
         await prisma.otp.delete({ where: { phone: payload.phone } }).catch(() => {});
 
-        // 4. Generate token
         const token = genrateToken(user.id.toString());
 
         return res.status(200).json({
@@ -337,7 +342,6 @@ export const updateProfile = async (req: Request, res: Response): Promise<any> =
     }
 
     try {
-        // Build data object only with provided fields
         const updateData: any = {};
         
         if (payload.about !== undefined) updateData.about = payload.about;
@@ -349,7 +353,6 @@ export const updateProfile = async (req: Request, res: Response): Promise<any> =
         if (payload.username !== undefined) updateData.username = payload.username;
         if (payload.profileImage !== undefined) updateData.profileImage = payload.profileImage;
 
-        // Check if username is being updated and if it's already taken by someone else
         if (updateData.username) {
             const existingUser = await prisma.user.findFirst({
                 where: { 

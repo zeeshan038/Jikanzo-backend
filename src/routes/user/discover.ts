@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { discoverPeople } from '../../controllers/user/Discover';
+import { discoverPeople } from '../../controllers/user/discover';
 import { verifyUser } from '../../middlewares/verifyUser';
 
 
