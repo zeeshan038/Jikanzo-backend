@@ -108,3 +108,102 @@ export const getCompanionsFeed = async (req: Request, res: Response) => {
         });
     }
 };
+
+
+
+/**
+ * @Description Toggle Save Companion
+ * @Route POST /api/feed/save-companion
+ * @Access Private
+ */
+export const saveCompanion = async (req: Request, res: Response): Promise<any> => {
+    const userId = (req as any).user.id;
+    const { companionId } = req.body;
+
+    if (!companionId) {
+        return res.status(400).json({ status: false, msg: "companionId is required" });
+    }
+
+    try {
+        const companion = await prisma.companionProfile.findUnique({
+            where: { id: Number(companionId) }
+        });
+
+        if (!companion) {
+            return res.status(404).json({ status: false, msg: "Companion not found" });
+        }
+
+        const existingSave = await prisma.savedCompanion.findUnique({
+            where: {
+                userId_companionId: {
+                    userId: Number(userId),
+                    companionId: Number(companionId)
+                }
+            }
+        });
+
+        if (existingSave) {
+            // Unsave
+            await prisma.savedCompanion.delete({
+                where: { id: existingSave.id }
+            });
+            return res.status(200).json({ status: true, msg: "Companion unsaved successfully", isSaved: false });
+        } else {
+            // Save
+            await prisma.savedCompanion.create({
+                data: {
+                    userId: Number(userId),
+                    companionId: Number(companionId)
+                }
+            });
+            return res.status(200).json({ status: true, msg: "Companion saved successfully", isSaved: true });
+        }
+    } catch (error: any) {
+        return res.status(500).json({ status: false, msg: error.message });
+    }
+};
+
+/**
+ * @Description Get Saved Companions
+ * @Route GET /api/feed/saved-companions
+ * @Access Private
+ */
+export const getSavedCompanions = async (req: Request, res: Response): Promise<any> => {
+    const userId = (req as any).user.id;
+
+    try {
+        const saved = await prisma.savedCompanion.findMany({
+            where: { userId: Number(userId) },
+            include: {
+                companion: {
+                    include: {
+                        user: {
+                            select: {
+                                id: true,
+                                username: true,
+                                profileImage: true
+                            }
+                        }
+                    }
+                }
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        const formatted = saved.map((s: any) => ({
+            savedId: s.id,
+            companionId: s.companion.id,
+            userId: s.companion.user.id,
+            username: s.companion.user.username,
+            profileImage: s.companion.user.profileImage,
+            isOnline: s.companion.isOnline,
+            rating: s.companion.rating,
+            hourlyRate: s.companion.hourlyRate,
+            savedAt: s.createdAt
+        }));
+
+        return res.status(200).json({ status: true, data: formatted });
+    } catch (error: any) {
+        return res.status(500).json({ status: false, msg: error.message });
+    }
+};

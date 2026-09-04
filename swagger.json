@@ -227,6 +227,48 @@
             "type": "integer"
           }
         }
+      },
+      "SaveCompanionRequest": {
+        "type": "object",
+        "required": [
+          "companionId"
+        ],
+        "properties": {
+          "companionId": {
+            "type": "integer"
+          }
+        }
+      },
+      "CreateMomentRequest": {
+        "type": "object",
+        "required": [
+          "mediaUrl"
+        ],
+        "properties": {
+          "mediaUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "caption": {
+            "type": "string"
+          }
+        }
+      },
+      "AppreciateMomentRequest": {
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "like",
+              "diamond",
+              "ring"
+            ]
+          }
+        }
       }
     }
   },
@@ -877,6 +919,244 @@
           },
           "500": {
             "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/feed/save-companion": {
+      "post": {
+        "tags": [
+          "Feed"
+        ],
+        "summary": "Toggle saving a companion",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveCompanionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Companion saved/unsaved successfully"
+          },
+          "400": {
+            "description": "Validation Error"
+          },
+          "404": {
+            "description": "Companion not found"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/feed/saved-companions": {
+      "get": {
+        "tags": [
+          "Feed"
+        ],
+        "summary": "Get all saved companions for the user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Fetched successfully"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/moments/create": {
+      "post": {
+        "tags": [
+          "Moments"
+        ],
+        "summary": "Create a new moment (Story)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMomentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Moment created successfully"
+          },
+          "400": {
+            "description": "Validation Error"
+          },
+          "403": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/moments/feed": {
+      "get": {
+        "tags": [
+          "Moments"
+        ],
+        "summary": "Get active moments feed",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "saved",
+                "nearby"
+              ]
+            }
+          },
+          {
+            "name": "lat",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "lng",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "radius",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Fetched successfully"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/moments/{id}": {
+      "delete": {
+        "tags": [
+          "Moments"
+        ],
+        "summary": "Delete a moment",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Moment deleted successfully"
+          },
+          "403": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Moment not found"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      },
+      "/moments/{id}/appreciate": {
+        "post": {
+          "tags": [
+            "Moments"
+          ],
+          "summary": "Appreciate a moment (Like, Diamond, Ring)",
+          "security": [
+            {
+              "bearerAuth": []
+            }
+          ],
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "integer"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppreciateMomentRequest"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Moment appreciated successfully"
+            },
+            "400": {
+              "description": "Invalid appreciation type"
+            },
+            "404": {
+              "description": "Moment not found"
+            },
+            "500": {
+              "description": "Internal Server Error"
+            }
           }
         }
       }

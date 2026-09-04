@@ -28,6 +28,8 @@ model User {
   savedLocations   Json?             @default(dbgenerated("'[]'"))
   gender           String?           @default("")
   age              Int?              @default(0)
+  gallery          String[]          @default([])
+  intros           String[]          @default([])
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   
@@ -35,6 +37,7 @@ model User {
   clientBookings   Booking[]         @relation("ClientBookings")
   clientReviews    Review[]          @relation("ClientReviews")
   walletTransactions WalletTransaction[]
+  savedCompanions  SavedCompanion[]  @relation("UserSavedCompanions")
 }
 
 model CompanionProfile {
@@ -59,6 +62,8 @@ model CompanionProfile {
   // Relations
   bookings    Booking[] @relation("CompanionBookings")
   reviews     Review[]  @relation("CompanionReviews")
+  savedBy     SavedCompanion[] @relation("SavedByUsers")
+  moments     Moment[]  @relation("CompanionMoments")
 }
 
 model Booking {
@@ -115,4 +120,30 @@ model WalletTransaction {
   createdAt   DateTime @default(now())
   
   user        User     @relation(fields: [userId], references: [id])
+}
+
+model SavedCompanion {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  companionId Int
+  createdAt   DateTime @default(now())
+
+  user        User             @relation("UserSavedCompanions", fields: [userId], references: [id])
+  companion   CompanionProfile @relation("SavedByUsers", fields: [companionId], references: [id])
+
+  @@unique([userId, companionId])
+}
+
+model Moment {
+  id          Int      @id @default(autoincrement())
+  companionId Int
+  mediaUrl    String
+  caption     String?
+  likes       Int      @default(0)
+  diamonds    Int      @default(0)
+  rings       Int      @default(0)
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+
+  companion   CompanionProfile @relation("CompanionMoments", fields: [companionId], references: [id])
 }

@@ -352,6 +352,8 @@ export const updateProfile = async (req: Request, res: Response): Promise<any> =
         if (payload.age !== undefined) updateData.age = payload.age;
         if (payload.username !== undefined) updateData.username = payload.username;
         if (payload.profileImage !== undefined) updateData.profileImage = payload.profileImage;
+        if (payload.gallery !== undefined) updateData.gallery = payload.gallery;
+        if (payload.intros !== undefined) updateData.intros = payload.intros;
 
         if (updateData.username) {
             const existingUser = await prisma.user.findFirst({
@@ -381,7 +383,9 @@ export const updateProfile = async (req: Request, res: Response): Promise<any> =
                 activityType: updatedUser.activityType,
                 gender: updatedUser.gender,
                 age: updatedUser.age,
-                profileImage: updatedUser.profileImage
+                profileImage: updatedUser.profileImage,
+                gallery: updatedUser.gallery,
+                intros: updatedUser.intros
             }
         });
 
@@ -418,6 +422,8 @@ export const whoami = async (req: Request, res: Response): Promise<any> => {
                 gender: true,
                 age: true,
                 walletBalance: true,
+                gallery: true,
+                intros: true,
                 
             }
         });
