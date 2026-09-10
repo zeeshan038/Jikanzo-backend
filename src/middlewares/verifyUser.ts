@@ -37,6 +37,7 @@ export const verifyUser = async (req: Request, res: Response, next: NextFunction
           phone: true,
           role: true,
           profileImage: true,
+          currentToken: true,
         },
       });
 
@@ -46,6 +47,14 @@ export const verifyUser = async (req: Request, res: Response, next: NextFunction
           msg: "Not authorized, user not found"
         });
       }
+
+      if (user.currentToken !== token) {
+        return res.status(401).json({
+          status: false,
+          msg: "Session expired. Logged in from another device."
+        });
+      }
+
 
       req.user = user;
       next();

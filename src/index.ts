@@ -35,7 +35,19 @@ const swaggerDocument = JSON.parse(
   fs.readFileSync(path.join(__dirname, '../swagger.json'), 'utf-8')
 );
 
-app.use('/swagger', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+const options = {
+  swaggerOptions: {
+    url: '/swagger.json'
+  }
+};
+app.use('/swagger', swaggerUi.serve, swaggerUi.setup(undefined, options));
+
+// Serve the raw swagger JSON
+app.get('/swagger.json', (req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerDocument);
+});
+
 
 //Routes
 app.use('/api',routes);

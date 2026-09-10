@@ -1,29 +1,54 @@
 version: '3.8'
 
 services:
+  backend:
+    build: .
+    container_name: jikanzo-backend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - DATABASE_URL=postgresql://postgres:mysecretpassword@postgres:5432/jikanzo_docker_db?schema=public
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=your_jwt_secret_here 
+    depends_on:
+      - postgres
+      - redis
+
   postgres:
     image: postgres:16
-    container_name: jikanzo-postgres-local
+    container_name: jikanzo-postgres
     restart: always
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: mysecretpassword
       POSTGRES_DB: jikanzo_docker_db
     ports:
-      - "5433:5432"
+      - "5432:5432" 
     volumes:
-      - pgdata-local:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: jikanzo-cloudflared
+    restart: always
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - backend
 
   redis:
     image: redis:7
-    container_name: jikanzo-redis-local
+    container_name: jikanzo-redis
     restart: always
     command: redis-server --appendonly yes
     ports:
       - "6379:6379"
     volumes:
-      - redisdata-local:/data
+      - redisdata:/data
 
 volumes:
-  pgdata-local:
-  redisdata-local:
+  pgdata:
+  redisdata:

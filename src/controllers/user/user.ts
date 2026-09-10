@@ -15,7 +15,10 @@ import {
 
 //Utils
 import { genrateToken } from '../../utils/methods';
-import { generateUniqueCloudflareId, ensureR2UserFolders } from '../../utils/cloudflare';
+import {
+    generateUniqueCloudflareId,
+    ensureR2UserFolders
+} from '../../utils/cloudflare';
 
 
 /**
@@ -38,7 +41,7 @@ export const sendOtp = async (req: Request, res: Response): Promise<any> => {
     try {
         // Generate a 6-digit OTP
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        const expiresAt = new Date(Date.now() + 10 * 60 * 1000); 
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
         // Upsert OTP record
         await prisma.otp.upsert({
@@ -126,9 +129,41 @@ export const verifyOtp = async (req: Request, res: Response): Promise<any> => {
             data: { isVerified: true }
         });
 
+        // Check if user already exists
+        const existingUser = await prisma.user.findFirst({
+            where: { phone: payload.phone }
+        });
+
+        if (existingUser) {
+            // User exists: auto-login
+            await prisma.otp.delete({ where: { phone: payload.phone } }).catch(() => { });
+
+            const token = genrateToken(existingUser.id.toString());
+            
+            await prisma.user.update({
+                where: { id: existingUser.id },
+                data: { currentToken: token }
+            });
+
+            return res.status(200).json({
+                status: true,
+                msg: "Phone number verified. User logged in successfully.",
+                isRegistered: true,
+                token,
+                user: {
+                    id: existingUser.id,
+                    username: existingUser.username,
+                    phone: existingUser.phone,
+                    role: existingUser.role
+                }
+            });
+        }
+
+        // New user: proceed to registration
         return res.status(200).json({
             status: true,
-            msg: "Phone number verified successfully. You can now register."
+            msg: "Phone number verified successfully. You can now register.",
+            isRegistered: false
         });
     } catch (error: any) {
         return res.status(500).json({
@@ -218,9 +253,14 @@ export const registerUser = async (req: Request, res: Response): Promise<any> =>
         });
 
         // Optional: Clean up OTP record now that they are registered
-        await prisma.otp.delete({ where: { phone: payload.phone } }).catch(() => {});
+        await prisma.otp.delete({ where: { phone: payload.phone } }).catch(() => { });
 
         const token = genrateToken(newUser.id.toString());
+
+        await prisma.user.update({
+            where: { id: newUser.id },
+            data: { currentToken: token }
+        });
 
         return res.status(201).json({
             status: true,
@@ -298,9 +338,14 @@ export const loginUser = async (req: Request, res: Response): Promise<any> => {
             });
         }
 
-        await prisma.otp.delete({ where: { phone: payload.phone } }).catch(() => {});
+        await prisma.otp.delete({ where: { phone: payload.phone } }).catch(() => { });
 
         const token = genrateToken(user.id.toString());
+
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { currentToken: token }
+        });
 
         return res.status(200).json({
             status: true,
@@ -343,7 +388,7 @@ export const updateProfile = async (req: Request, res: Response): Promise<any> =
 
     try {
         const updateData: any = {};
-        
+
         if (payload.about !== undefined) updateData.about = payload.about;
         if (payload.languages !== undefined) updateData.languages = payload.languages;
         if (payload.activityType !== undefined) updateData.activityType = payload.activityType;
@@ -357,13 +402,16 @@ export const updateProfile = async (req: Request, res: Response): Promise<any> =
 
         if (updateData.username) {
             const existingUser = await prisma.user.findFirst({
-                where: { 
+                where: {
                     username: updateData.username,
                     NOT: { id: userId }
                 }
             });
             if (existingUser) {
-                return res.status(409).json({ status: false, msg: "Username is already taken" });
+                return res.status(409).json({
+                    status: false,
+                    msg: "Username is already taken"
+                });
             }
         }
 
@@ -374,19 +422,7 @@ export const updateProfile = async (req: Request, res: Response): Promise<any> =
 
         return res.status(200).json({
             status: true,
-            msg: "Profile updated successfully",
-            user: {
-                id: updatedUser.id,
-                username: updatedUser.username,
-                about: updatedUser.about,
-                languages: updatedUser.languages,
-                activityType: updatedUser.activityType,
-                gender: updatedUser.gender,
-                age: updatedUser.age,
-                profileImage: updatedUser.profileImage,
-                gallery: updatedUser.gallery,
-                intros: updatedUser.intros
-            }
+            msg: "Profile updated successfully"
         });
 
     } catch (error: any) {
@@ -424,7 +460,11 @@ export const whoami = async (req: Request, res: Response): Promise<any> => {
                 walletBalance: true,
                 gallery: true,
                 intros: true,
-                
+                companionProfile: {
+                    select: {
+                        id: true
+                    }
+                }
             }
         });
 
@@ -447,3 +487,78 @@ export const whoami = async (req: Request, res: Response): Promise<any> => {
         });
     }
 };
+
+
+/**
+ * @Description Check Profile Verifitcation Progress
+ * @Method POST api/user/check-profile-progress
+ * @Access Private
+ */
+export const checkProfileProgress = async (req: Request, res: Response): Promise<any> => {
+    const userId = (req as any).user?.id;
+
+    try {
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            include: { companionProfile: true }
+        });
+
+        if (!user) {
+            return res.status(404).json({ status: false, msg: "User not found" });
+        }
+
+        let totalFields = 0;
+        let completedFields = 0;
+
+        const checkField = (field: any) => {
+            totalFields++;
+            if (field !== null && field !== undefined && field !== "" && field !== 0) {
+                if (Array.isArray(field) && field.length === 0) return;
+                completedFields++;
+            }
+        };
+
+        // Check base user fields
+        checkField(user.profileImage);
+        checkField(user.about);
+        checkField(user.languages);
+        checkField(user.activityType);
+        checkField(user.gender);
+        checkField(user.age);
+        checkField(user.gallery);
+        checkField(user.intros);
+
+        // Check companion fields if applicable
+        if (user.role === 'COMPANION' || user.role === 'BOTH') {
+            const companion = user.companionProfile;
+            checkField(companion?.bio);
+            checkField(companion?.hourlyRate);
+            checkField(companion?.locationLat);
+            checkField(companion?.locationLng);
+        }
+
+        const percentage = totalFields === 0 ? 0 : Math.round((completedFields / totalFields) * 100);
+
+        return res.status(200).json({
+            status: true,
+            msg: "Profile progress calculated",
+            data: {
+                percentage,
+                completedFields,
+                totalFields
+            }
+        });
+    } catch (error: any) {
+        return res.status(500).json({
+            status: false,
+            msg: error.message
+        });
+    }
+}
+
+
+/**
+ * @Description Update FCM 
+ * @Method POST api/user/check-profile-progress
+ * @Access Private
+ */

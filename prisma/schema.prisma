@@ -38,6 +38,7 @@ model User {
   clientReviews    Review[]          @relation("ClientReviews")
   walletTransactions WalletTransaction[]
   savedCompanions  SavedCompanion[]  @relation("UserSavedCompanions")
+  currentToken     String?
 }
 
 model CompanionProfile {

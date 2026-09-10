@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import prisma from "../../config/db";
 import { createBooking, acceptBooking } from "../../schema/user/booking";
+import { payWithWalletSchema } from '../../schema/user/wallet';
 
 /**
  * @Description Book a companion
@@ -112,7 +113,7 @@ export const acceptBookingController = async (req: Request, res: Response) => {
   }
 };
 
-import { payWithWalletSchema } from '../../schema/user/wallet';
+
 
 /**
  * @Description Pay for a booking with wallet balance
@@ -121,7 +122,7 @@ import { payWithWalletSchema } from '../../schema/user/wallet';
  */
 export const payWithWallet = async (req: Request, res: Response) => {
   const payload = req.body;
-  const userId = (req as any).user?.id || 1; // Fallback for testing
+  const userId = (req as any).user?.id;
 
   const result = payWithWalletSchema.validate(payload);
   if (result.error) {

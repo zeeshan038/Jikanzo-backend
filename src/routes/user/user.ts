@@ -6,7 +6,8 @@ import {
     registerUser,
     loginUser,
     updateProfile,
-    whoami
+    whoami,
+    checkProfileProgress
 } from '../../controllers/user/user';
 
 import { uploadImage } from '../../controllers/user/upload';
@@ -27,5 +28,6 @@ router.put('/update-profile', updateProfile);
 router.get('/whoami', whoami);
 
 router.post('/upload-image', upload.single('image'), uploadImage);
+router.get('/check-progress', checkProfileProgress);
 
 export default router;

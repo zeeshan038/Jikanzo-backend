@@ -1,5 +1,10 @@
 import express from 'express';
-import { createMoment, getFeedMoments, deleteMoment, appreciateMoment } from '../../controllers/user/moments';
+import { 
+    createMoment, 
+    getFeedMoments, 
+    deleteMoment, 
+    appreciateMoment 
+} from '../../controllers/user/moments';
 import { verifyUser } from '../../middlewares/verifyUser';
 
 const router = express.Router();

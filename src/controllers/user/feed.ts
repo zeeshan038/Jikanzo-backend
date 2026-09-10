@@ -117,27 +117,28 @@ export const getCompanionsFeed = async (req: Request, res: Response) => {
  * @Access Private
  */
 export const saveCompanion = async (req: Request, res: Response): Promise<any> => {
-    const userId = (req as any).user.id;
-    const { companionId } = req.body;
+    const currentUserId = (req as any).user.id;
+    const { targetUserId } = req.body;
 
-    if (!companionId) {
-        return res.status(400).json({ status: false, msg: "companionId is required" });
+    if (!targetUserId) {
+        return res.status(400).json({ status: false, msg: "targetUserId is required" });
     }
 
     try {
+        // Find the companion profile using the target user's ID
         const companion = await prisma.companionProfile.findUnique({
-            where: { id: Number(companionId) }
+            where: { userId: Number(targetUserId) }
         });
 
         if (!companion) {
-            return res.status(404).json({ status: false, msg: "Companion not found" });
+            return res.status(404).json({ status: false, msg: "Companion profile not found for this user" });
         }
 
         const existingSave = await prisma.savedCompanion.findUnique({
             where: {
                 userId_companionId: {
-                    userId: Number(userId),
-                    companionId: Number(companionId)
+                    userId: Number(currentUserId),
+                    companionId: companion.id
                 }
             }
         });
@@ -152,8 +153,8 @@ export const saveCompanion = async (req: Request, res: Response): Promise<any> =
             // Save
             await prisma.savedCompanion.create({
                 data: {
-                    userId: Number(userId),
-                    companionId: Number(companionId)
+                    userId: Number(currentUserId),
+                    companionId: companion.id
                 }
             });
             return res.status(200).json({ status: true, msg: "Companion saved successfully", isSaved: true });

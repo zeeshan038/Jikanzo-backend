@@ -7,6 +7,10 @@
   },
   "servers": [
     {
+      "url": "http://192.168.22.78:3000/api",
+      "description": "Deployed Server"
+    },
+    {
       "url": "http://localhost:7070/api",
       "description": "Local Development Server"
     }
@@ -122,6 +126,26 @@
           }
         }
       },
+      "VerifyOtpResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "boolean"
+          },
+          "msg": {
+            "type": "string"
+          },
+          "isRegistered": {
+            "type": "boolean"
+          },
+          "token": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        }
+      },
       "ApiError": {
         "type": "object",
         "properties": {
@@ -173,7 +197,56 @@
           "profileImage": {
             "type": "string",
             "format": "uri"
+          },
+          "gallery": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "intros": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
           }
+        },
+        "example": {
+          "about": "Hi, I am a professional companion who loves traveling and meeting new people!",
+          "languages": [
+            "English",
+            "Japanese"
+          ],
+          "activityType": [
+            "Dinner",
+            "City Tour",
+            "Event Companion"
+          ],
+          "savedLocations": [
+            {
+              "name": "Tokyo Tower",
+              "lat": 35.6586,
+              "lng": 139.7454
+            },
+            {
+              "name": "Shibuya Crossing",
+              "lat": 35.6595,
+              "lng": 139.7001
+            }
+          ],
+          "gender": "Female",
+          "age": 24,
+          "username": "traveler_jane",
+          "profileImage": "https://cdn.jikanzo.com/users/jane_profile_pic.jpg",
+          "gallery": [
+            "https://cdn.jikanzo.com/users/jane_gallery_1.jpg",
+            "https://cdn.jikanzo.com/users/jane_gallery_2.jpg"
+          ],
+          "intros": [
+            "https://cdn.jikanzo.com/users/jane_intro_video.mp4"
+          ]
         }
       },
       "CreateBookingRequest": {
@@ -231,10 +304,10 @@
       "SaveCompanionRequest": {
         "type": "object",
         "required": [
-          "companionId"
+          "targetUserId"
         ],
         "properties": {
-          "companionId": {
+          "targetUserId": {
             "type": "integer"
           }
         }
@@ -405,7 +478,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MessageResponse"
+                  "$ref": "#/components/schemas/VerifyOtpResponse"
                 }
               }
             }
@@ -767,7 +840,15 @@
         },
         "responses": {
           "200": {
-            "description": "Profile updated successfully"
+            "description": "Profile updated successfully",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": true,
+                  "msg": "Profile updated successfully"
+                }
+              }
+            }
           },
           "400": {
             "description": "Validation Error"
@@ -791,7 +872,85 @@
         ],
         "responses": {
           "200": {
-            "description": "User details fetched successfully"
+            "description": "User details fetched successfully",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": true,
+                  "msg": "User profile fetched successfully",
+                  "user": {
+                    "id": "507f1f77bcf86cd799439011",
+                    "username": "traveler_jane",
+                    "phone": "+1234567890",
+                    "role": "USER",
+                    "profileImage": "https://cdn.jikanzo.com/users/jane_profile_pic.jpg",
+                    "about": "Hi, I am a professional companion who loves traveling and meeting new people!",
+                    "languages": [
+                      "English",
+                      "Japanese"
+                    ],
+                    "activityType": [
+                      "Dinner",
+                      "City Tour",
+                      "Event Companion"
+                    ],
+                    "savedLocations": [
+                      {
+                        "name": "Tokyo Tower",
+                        "lat": 35.6586,
+                        "lng": 139.7454
+                      }
+                    ],
+                    "gender": "Female",
+                    "age": 24,
+                    "walletBalance": 0,
+                    "gallery": [
+                      "https://cdn.jikanzo.com/users/jane_gallery_1.jpg"
+                    ],
+                    "intros": [
+                      "https://cdn.jikanzo.com/users/jane_intro_video.mp4"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/user/check-progress": {
+      "get": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Check Profile Verification Progress",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profile progress calculated",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": true,
+                  "msg": "Profile progress calculated",
+                  "data": {
+                    "percentage": 100,
+                    "completedFields": 8,
+                    "totalFields": 8
+                  }
+                }
+              }
+            }
           },
           "404": {
             "description": "User not found"
@@ -1112,51 +1271,51 @@
             "description": "Internal Server Error"
           }
         }
-      },
-      "/moments/{id}/appreciate": {
-        "post": {
-          "tags": [
-            "Moments"
-          ],
-          "summary": "Appreciate a moment (Like, Diamond, Ring)",
-          "security": [
-            {
-              "bearerAuth": []
-            }
-          ],
-          "parameters": [
-            {
-              "name": "id",
-              "in": "path",
-              "required": true,
-              "schema": {
-                "type": "integer"
-              }
-            }
-          ],
-          "requestBody": {
+      }
+    },
+    "/moments/{id}/appreciate": {
+      "post": {
+        "tags": [
+          "Moments"
+        ],
+        "summary": "Appreciate a moment (Like, Diamond, Ring)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
             "required": true,
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AppreciateMomentRequest"
-                }
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppreciateMomentRequest"
               }
             }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Moment appreciated successfully"
           },
-          "responses": {
-            "200": {
-              "description": "Moment appreciated successfully"
-            },
-            "400": {
-              "description": "Invalid appreciation type"
-            },
-            "404": {
-              "description": "Moment not found"
-            },
-            "500": {
-              "description": "Internal Server Error"
-            }
+          "400": {
+            "description": "Invalid appreciation type"
+          },
+          "404": {
+            "description": "Moment not found"
+          },
+          "500": {
+            "description": "Internal Server Error"
           }
         }
       }
