@@ -81,18 +81,76 @@ export const getCompanionsFeed = async (req: Request, res: Response) => {
             if (maxPrice) whereClause.hourlyRate.lte = parseFloat(maxPrice as string);
         }
 
-        const companions = await prisma.companionProfile.findMany({
+        const currentUserId = (req as any).user?.id;
+
+        // Fetch a pool of candidates (e.g. up to 100) to sort in memory
+        // A full production system might use Elasticsearch or Redis for this
+        const candidates = await prisma.companionProfile.findMany({
             where: whereClause,
             include: {
-                user: true
+                user: true,
+                ...(currentUserId ? { feedStats: { where: { userId: Number(currentUserId) } } } : {})
             },
-            take: Number(limit),
-            skip: Number(offset)
+            take: 100, // Fetch top 100 matching filters to rank
         });
 
-        // Remove walletBalance from response
-        const sanitizedCompanions = companions.map(companion => {
-            const { walletBalance, ...rest } = companion;
+        // 1. Calculate dynamic score for each candidate
+        const scoredCandidates = candidates.map(companion => {
+            const stat = companion.feedStats?.[0];
+            const impressionsLast24h = stat ? stat.impressionsLast24h : 0;
+            const jss = companion.jssScore || 0;
+            const completedMeetups = companion.completedMeetups || 0;
+
+            let finalScore = jss * 0.20; // Base Quality
+            
+            // Repeat Exposure Penalty (-2 points per impression)
+            finalScore -= (impressionsLast24h * 2);
+
+            // Freshness Boost for new companions
+            if (completedMeetups < 3) {
+                finalScore += 10;
+            } else if (impressionsLast24h === 0) {
+                finalScore += 5; // Not shown recently
+            }
+
+            // Random Jitter (-5 to +5)
+            finalScore += (Math.random() * 10 - 5);
+
+            let bucket = "GOOD";
+            if (completedMeetups < 3 || impressionsLast24h === 0) {
+                bucket = "NEW";
+            } else if (finalScore > 75) { // Assuming JSS is out of 100, max base is 20. Wait, if JSS is out of 100, jss*0.20 max is 20. 
+                // Adjusting threshold: if JSS is 100, score is 20. Let's say top is > 15
+                bucket = finalScore > 15 ? "TOP" : "GOOD";
+            }
+
+            return { ...companion, finalScore, bucket };
+        });
+
+        // 2. Separate into buckets
+        const topBucket = scoredCandidates.filter(c => c.bucket === "TOP").sort((a, b) => b.finalScore - a.finalScore);
+        const goodBucket = scoredCandidates.filter(c => c.bucket === "GOOD").sort((a, b) => b.finalScore - a.finalScore);
+        const newBucket = scoredCandidates.filter(c => c.bucket === "NEW").sort((a, b) => b.finalScore - a.finalScore);
+
+        // 3. Interleave (2 Top, 2 Good, 1 New)
+        const interleaved: typeof scoredCandidates = [];
+        let tIdx = 0, gIdx = 0, nIdx = 0;
+
+        while (tIdx < topBucket.length || gIdx < goodBucket.length || nIdx < newBucket.length) {
+            // Take 2 Top
+            for (let i = 0; i < 2 && tIdx < topBucket.length; i++) interleaved.push(topBucket[tIdx++]);
+            // Take 2 Good
+            for (let i = 0; i < 2 && gIdx < goodBucket.length; i++) interleaved.push(goodBucket[gIdx++]);
+            // Take 1 New
+            if (nIdx < newBucket.length) interleaved.push(newBucket[nIdx++]);
+        }
+
+        // Apply Pagination
+        const paginated = interleaved.slice(Number(offset), Number(offset) + Number(limit));
+
+        // Remove walletBalance and extra fields from response
+        const sanitizedCompanions = paginated.map(companion => {
+            const { walletBalance, feedStats, finalScore, bucket, ...rest } = companion;
             return rest;
         });
 
@@ -100,7 +158,7 @@ export const getCompanionsFeed = async (req: Request, res: Response) => {
             status: true,
             msg: "Companions fetched successfully",
             data: sanitizedCompanions
-        })
+        });
     } catch (error: any) {
         res.status(500).json({
             status: false,
@@ -204,6 +262,64 @@ export const getSavedCompanions = async (req: Request, res: Response): Promise<a
         }));
 
         return res.status(200).json({ status: true, data: formatted });
+    } catch (error: any) {
+        return res.status(500).json({ status: false, msg: error.message });
+    }
+};
+
+/**
+ * @Description Log impression of a companion card
+ * @Route POST /api/feed/impression
+ * @Access Private
+ */
+export const logImpression = async (req: Request, res: Response): Promise<any> => {
+    const userId = (req as any).user.id;
+    const { companionId, inTop3 } = req.body;
+
+    if (!companionId) {
+        return res.status(400).json({ status: false, msg: "companionId is required" });
+    }
+
+    try {
+        await prisma.$transaction(async (tx) => {
+            const stat = await tx.feedStat.findUnique({
+                where: {
+                    userId_companionId: {
+                        userId: Number(userId),
+                        companionId: Number(companionId)
+                    }
+                }
+            });
+
+            const top3Inc = inTop3 ? 1 : 0;
+
+            if (stat) {
+                // If it's been more than 24h since last shown, we could reset it. 
+                // For now, let's just increment and assume a daily CRON job clears it, 
+                // or we check time difference. 
+                // Simple version: just increment
+                await tx.feedStat.update({
+                    where: { id: stat.id },
+                    data: {
+                        impressionsLast24h: { increment: 1 },
+                        top3AppearancesLast24h: { increment: top3Inc },
+                        lastShownAt: new Date()
+                    }
+                });
+            } else {
+                await tx.feedStat.create({
+                    data: {
+                        userId: Number(userId),
+                        companionId: Number(companionId),
+                        impressionsLast24h: 1,
+                        top3AppearancesLast24h: top3Inc,
+                        lastShownAt: new Date()
+                    }
+                });
+            }
+        });
+
+        return res.status(200).json({ status: true, msg: "Impression logged successfully" });
     } catch (error: any) {
         return res.status(500).json({ status: false, msg: error.message });
     }

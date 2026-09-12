@@ -301,6 +301,32 @@
           }
         }
       },
+      "CompleteBookingRequest": {
+        "type": "object",
+        "required": [
+          "bookingId"
+        ],
+        "properties": {
+          "bookingId": {
+            "type": "integer"
+          }
+        }
+      },
+      "LogImpressionRequest": {
+        "type": "object",
+        "required": [
+          "companionId",
+          "inTop3"
+        ],
+        "properties": {
+          "companionId": {
+            "type": "integer"
+          },
+          "inTop3": {
+            "type": "boolean"
+          }
+        }
+      },
       "SaveCompanionRequest": {
         "type": "object",
         "required": [
@@ -1045,6 +1071,43 @@
         }
       }
     },
+    "/booking/complete": {
+      "post": {
+        "tags": [
+          "Booking"
+        ],
+        "summary": "Complete a booking",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteBookingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Booking status updated to COMPLETED successfully"
+          },
+          "400": {
+            "description": "Validation Error"
+          },
+          "404": {
+            "description": "Booking not found"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
     "/booking/pay-with-wallet": {
       "post": {
         "tags": [
@@ -1075,6 +1138,40 @@
           },
           "404": {
             "description": "Booking not found"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/feed/impression": {
+      "post": {
+        "tags": [
+          "Feed"
+        ],
+        "summary": "Log an impression for a companion card",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogImpressionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Impression logged successfully"
+          },
+          "400": {
+            "description": "Validation Error"
           },
           "500": {
             "description": "Internal Server Error"

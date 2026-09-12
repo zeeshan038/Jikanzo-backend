@@ -39,6 +39,8 @@ model User {
   walletTransactions WalletTransaction[]
   savedCompanions  SavedCompanion[]  @relation("UserSavedCompanions")
   currentToken     String?
+  fcmToken         String?
+  feedStats        FeedStat[]        @relation("UserFeedStats")
 }
 
 model CompanionProfile {
@@ -59,12 +61,16 @@ model CompanionProfile {
   trustRank      String   @default("New") // "Premium", "New", etc.
   totalSessions  Int      @default(0)
   repeatClients  Int      @default(0)
+  jssScore       Float?   @default(0.0)
+  completedMeetups Int    @default(0)
+  reliabilityScore Float  @default(100.0)
 
   // Relations
   bookings    Booking[] @relation("CompanionBookings")
   reviews     Review[]  @relation("CompanionReviews")
   savedBy     SavedCompanion[] @relation("SavedByUsers")
   moments     Moment[]  @relation("CompanionMoments")
+  feedStats   FeedStat[] @relation("CompanionFeedStats")
 }
 
 model Booking {
@@ -78,6 +84,8 @@ model Booking {
   totalAmount  Float?
   paymentStatus String  @default("PENDING") // PENDING, PAID, FAILED
   stripePaymentIntentId String?
+  cancelledById Int?
+  cancellationReason String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -147,4 +155,18 @@ model Moment {
   expiresAt   DateTime
 
   companion   CompanionProfile @relation("CompanionMoments", fields: [companionId], references: [id])
+}
+
+model FeedStat {
+  id                     Int      @id @default(autoincrement())
+  userId                 Int      // The customer
+  companionId            Int      // The companion being viewed
+  impressionsLast24h     Int      @default(0)
+  top3AppearancesLast24h Int      @default(0)
+  lastShownAt            DateTime @default(now())
+  
+  user                   User             @relation("UserFeedStats", fields: [userId], references: [id])
+  companion              CompanionProfile @relation("CompanionFeedStats", fields: [companionId], references: [id])
+
+  @@unique([userId, companionId])
 }

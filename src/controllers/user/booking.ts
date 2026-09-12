@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import prisma from "../../config/db";
 import { createBooking, acceptBooking } from "../../schema/user/booking";
 import { payWithWalletSchema } from '../../schema/user/wallet';
+import { calculateJSS } from "../../utils/jssCalculator";
 
 /**
  * @Description Book a companion
@@ -95,10 +96,34 @@ export const acceptBookingController = async (req: Request, res: Response) => {
 
     const newStatus = action === 'ACCEPT' ? 'ACCEPTED' : 'CANCELLED';
 
+    const updateData: any = { status: newStatus };
+    
+    // If it's cancelled, log who cancelled it. Also apply reliability penalty if companion responsible
+    if (newStatus === 'CANCELLED') {
+      const isCompanion = (req as any).user?.id === booking.companion.userId;
+      updateData.cancelledById = (req as any).user?.id;
+      
+      if (isCompanion) {
+         // Decrease reliability score by 10 (configurable)
+         await prisma.companionProfile.update({
+            where: { id: booking.companionId },
+            data: {
+               reliabilityScore: { decrement: 10 }
+            }
+         });
+      }
+    }
+
     const updatedBooking = await prisma.booking.update({
       where: { id: bookingId },
-      data: { status: newStatus }
+      data: updateData
     });
+
+    // Trigger JSS Recalculation if it's a cancellation
+    if (newStatus === 'CANCELLED') {
+        // Run asynchronously
+        calculateJSS(booking.companionId).catch(err => console.error("JSS Calculation Error:", err));
+    }
 
     return res.status(200).json({
       status: true,
@@ -110,6 +135,41 @@ export const acceptBookingController = async (req: Request, res: Response) => {
        status: false, 
        msg: error.message 
      });
+  }
+};
+
+/**
+ * @Description Complete a booking
+ * @Route POST /api/booking/complete
+ * @Access Private
+ */
+export const completeBookingController = async (req: Request, res: Response) => {
+  const { bookingId } = req.body;
+  
+  try {
+     const booking = await prisma.booking.findUnique({
+        where: { id: bookingId }
+     });
+
+     if (!booking) {
+        return res.status(404).json({ status: false, msg: "Booking not found" });
+     }
+
+     const updatedBooking = await prisma.booking.update({
+        where: { id: bookingId },
+        data: { status: 'COMPLETED' }
+     });
+
+     // Trigger JSS Recalculation asynchronously
+     calculateJSS(booking.companionId).catch(err => console.error("JSS Calculation Error:", err));
+
+     return res.status(200).json({
+        status: true,
+        msg: "Booking completed successfully",
+        data: updatedBooking
+     });
+  } catch (error: any) {
+     res.status(500).json({ status: false, msg: error.message });
   }
 };
 

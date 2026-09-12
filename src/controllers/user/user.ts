@@ -559,6 +559,34 @@ export const checkProfileProgress = async (req: Request, res: Response): Promise
 
 /**
  * @Description Update FCM 
- * @Method POST api/user/check-profile-progress
+ * @Method POST api/user/update-fcm
  * @Access Private
  */
+export const UpdateFcm = async (req: Request, res: Response): Promise<any> =>{
+    const userId = (req as any).user?.id;
+    const { fcm } = req.body;
+
+    if (!fcm) {
+        return res.status(400).json({
+            status: false,
+            msg: "fcm is required"
+        });
+    }
+
+    try {
+        await prisma.user.update({
+            where: { id: userId },
+            data: { fcmToken: fcm }
+        });
+
+        return res.status(200).json({
+            status: true,
+            msg: "FCM token updated successfully"
+        });
+    } catch (error: any) {
+        return res.status(500).json({
+            status: false,
+            msg: error.message
+        });
+    }
+}
