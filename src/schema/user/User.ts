@@ -30,5 +30,6 @@ export const UpdateProfileSchema = Joi.object({
   username: Joi.string().min(3).max(30).optional(),
   profileImage: Joi.string().uri().allow('', null).optional(),
   gallery: Joi.array().items(Joi.string().uri().allow('', null)).optional(),
-  intros: Joi.array().items(Joi.string().uri().allow('', null)).optional()
+  intros: Joi.array().items(Joi.string().uri().allow('', null)).optional(),
+  serviceRadius: Joi.number().integer().min(0).allow(null).optional()
 });

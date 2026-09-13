@@ -52,6 +52,9 @@ model CompanionProfile {
   hourlyRate  Float?
   locationLat Float?
   locationLng Float?
+  serviceRadius Int?     @default(10)
+  bookingBufferMin Int   @default(60) // e.g., 30, 60, 90, 120
+  isPaused       Boolean  @default(false)
 
   // UI Specific Fields
   isOnline       Boolean  @default(false)
@@ -64,6 +67,7 @@ model CompanionProfile {
   jssScore       Float?   @default(0.0)
   completedMeetups Int    @default(0)
   reliabilityScore Float  @default(100.0)
+  
 
   // Relations
   bookings    Booking[] @relation("CompanionBookings")
@@ -71,6 +75,9 @@ model CompanionProfile {
   savedBy     SavedCompanion[] @relation("SavedByUsers")
   moments     Moment[]  @relation("CompanionMoments")
   feedStats   FeedStat[] @relation("CompanionFeedStats")
+  schedules           WeeklySchedule[]
+  oneTimeAvailabilities OneTimeAvailability[]
+  blockedDates        BlockedDate[]
 }
 
 model Booking {
@@ -169,4 +176,38 @@ model FeedStat {
   companion              CompanionProfile @relation("CompanionFeedStats", fields: [companionId], references: [id])
 
   @@unique([userId, companionId])
+}
+
+model WeeklySchedule {
+  id          Int      @id @default(autoincrement())
+  companionId Int
+  dayOfWeek   Int      // 0=Sunday, 1=Monday, etc.
+  isAvailable Boolean  @default(true)
+  startTime   String?  // Storing as "18:00" format
+  endTime     String?  // Storing as "22:00" format
+
+  companion   CompanionProfile @relation(fields: [companionId], references: [id])
+  
+  @@unique([companionId, dayOfWeek])
+}
+
+model OneTimeAvailability {
+  id          Int      @id @default(autoincrement())
+  companionId Int
+  date        DateTime // e.g., Aug 17, 2025
+  startTime   String   // "12:00"
+  endTime     String   // "17:00"
+  location    String?  // Optional location specific to this date
+
+  companion   CompanionProfile @relation(fields: [companionId], references: [id])
+}
+
+model BlockedDate {
+  id          Int      @id @default(autoincrement())
+  companionId Int
+  startDate   DateTime
+  endDate     DateTime
+  reason      String?  // e.g., "Vacation"
+
+  companion   CompanionProfile @relation(fields: [companionId], references: [id])
 }

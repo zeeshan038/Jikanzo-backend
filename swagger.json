@@ -162,22 +162,67 @@
       "CompanionDto": {
         "type": "object",
         "properties": {
-          "id": { "type": "integer", "example": 12 },
-          "userId": { "type": "integer", "example": 5 },
-          "bio": { "type": "string", "example": "I love traveling and exploring new places." },
-          "hourlyRate": { "type": "number", "example": 50.0 },
-          "locationLat": { "type": "number", "example": 35.6895 },
-          "locationLng": { "type": "number", "example": 139.6917 },
-          "isOnline": { "type": "boolean", "example": true },
-          "jssScore": { "type": "number", "example": 85.5 },
-          "completedMeetups": { "type": "integer", "example": 14 },
-          "finalScore": { "type": "number", "example": 22.4, "description": "Dynamic ranking score" },
-          "bucket": { "type": "string", "example": "TOP", "description": "Ranking bucket: TOP, GOOD, or NEW" },
+          "id": {
+            "type": "integer",
+            "example": 12
+          },
+          "userId": {
+            "type": "integer",
+            "example": 5
+          },
+          "bio": {
+            "type": "string",
+            "example": "I love traveling and exploring new places."
+          },
+          "hourlyRate": {
+            "type": "number",
+            "example": 50.0
+          },
+          "locationLat": {
+            "type": "number",
+            "example": 35.6895
+          },
+          "locationLng": {
+            "type": "number",
+            "example": 139.6917
+          },
+          "isOnline": {
+            "type": "boolean",
+            "example": true
+          },
+          "serviceRadius": {
+            "type": "integer",
+            "example": 10
+          },
+          "jssScore": {
+            "type": "number",
+            "example": 85.5
+          },
+          "completedMeetups": {
+            "type": "integer",
+            "example": 14
+          },
+          "finalScore": {
+            "type": "number",
+            "example": 22.4,
+            "description": "Dynamic ranking score"
+          },
+          "bucket": {
+            "type": "string",
+            "example": "TOP",
+            "description": "Ranking bucket: TOP, GOOD, or NEW"
+          },
           "user": {
             "type": "object",
             "properties": {
-              "username": { "type": "string", "example": "traveler_jane" },
-              "profileImage": { "type": "string", "example": "https://cdn.jikanzo.com/users/jane.jpg" }
+              "username": {
+                "type": "string",
+                "example": "traveler_jane"
+              },
+              "profileImage": {
+                "type": "string",
+                "example": "https://cdn.jikanzo.com/users/jane.jpg"
+              }
             }
           }
         }
@@ -185,15 +230,42 @@
       "MomentDto": {
         "type": "object",
         "properties": {
-          "id": { "type": "integer", "example": 101 },
-          "companionId": { "type": "integer", "example": 12 },
-          "mediaUrl": { "type": "string", "example": "https://cdn.jikanzo.com/moments/video.mp4" },
-          "caption": { "type": "string", "example": "Having a great time in Tokyo!" },
-          "likes": { "type": "integer", "example": 150 },
-          "diamonds": { "type": "integer", "example": 5 },
-          "rings": { "type": "integer", "example": 1 },
-          "createdAt": { "type": "string", "format": "date-time" },
-          "expiresAt": { "type": "string", "format": "date-time" },
+          "id": {
+            "type": "integer",
+            "example": 101
+          },
+          "companionId": {
+            "type": "integer",
+            "example": 12
+          },
+          "mediaUrl": {
+            "type": "string",
+            "example": "https://cdn.jikanzo.com/moments/video.mp4"
+          },
+          "caption": {
+            "type": "string",
+            "example": "Having a great time in Tokyo!"
+          },
+          "likes": {
+            "type": "integer",
+            "example": 150
+          },
+          "diamonds": {
+            "type": "integer",
+            "example": 5
+          },
+          "rings": {
+            "type": "integer",
+            "example": 1
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
           "companion": {
             "$ref": "#/components/schemas/CompanionDto"
           }
@@ -251,6 +323,9 @@
               "type": "string",
               "format": "uri"
             }
+          },
+          "serviceRadius": {
+            "type": "integer"
           }
         },
         "example": {
@@ -724,6 +799,180 @@
         }
       }
     },
+    "/user/upload-video": {
+      "post": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Upload a single video to Cloudflare R2 and add to intros",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "video": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Video uploaded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Missing or Invalid Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/upload-gallery": {
+      "post": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Update the user's gallery with an array of image URLs",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "images": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  }
+                },
+                "required": [
+                  "images"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Gallery updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "urls": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Missing or Invalid Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/discover/people": {
       "get": {
         "tags": [
@@ -901,6 +1150,221 @@
                       }
                     }
                   }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/feed/specific/{userId}": {
+      "get": {
+        "tags": [
+          "Feed"
+        ],
+        "summary": "Get specific companion profile with analytics and reviews",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Companion fetched successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "bio": {
+                          "type": "string"
+                        },
+                        "hourlyRate": {
+                          "type": "number"
+                        },
+                        "locationLat": {
+                          "type": "number"
+                        },
+                        "locationLng": {
+                          "type": "number"
+                        },
+                        "isOnline": {
+                          "type": "boolean"
+                        },
+                        "rating": {
+                          "type": "number"
+                        },
+                        "trustRank": {
+                          "type": "string"
+                        },
+                        "isSaved": {
+                          "type": "boolean"
+                        },
+                        "user": {
+                          "type": "object",
+                          "properties": {
+                            "username": {
+                              "type": "string"
+                            },
+                            "profileImage": {
+                              "type": "string"
+                            },
+                            "age": {
+                              "type": "integer"
+                            },
+                            "gender": {
+                              "type": "string"
+                            },
+                            "about": {
+                              "type": "string"
+                            },
+                            "languages": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "activityType": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "gallery": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "intros": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "reviews": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "rating": {
+                                "type": "number"
+                              },
+                              "comment": {
+                                "type": "string"
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "client": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "integer"
+                                  },
+                                  "username": {
+                                    "type": "string"
+                                  },
+                                  "profileImage": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "momentsAnalytics": {
+                          "type": "object",
+                          "properties": {
+                            "totalLikes": {
+                              "type": "integer"
+                            },
+                            "totalRings": {
+                              "type": "integer"
+                            },
+                            "totalDiamonds": {
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        "performance": {
+                          "type": "object",
+                          "properties": {
+                            "rating": {
+                              "type": "number"
+                            },
+                            "totalSessions": {
+                              "type": "integer"
+                            },
+                            "repeatClients": {
+                              "type": "integer"
+                            },
+                            "repeatRate": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Companion not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Missing or Invalid Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             }
@@ -1828,6 +2292,592 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/availability/get-availability": {
+      "get": {
+        "tags": [
+          "Availability"
+        ],
+        "summary": "Get full availability profile for current companion",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Availability fetched successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "bookingBufferMin": {
+                          "type": "integer"
+                        },
+                        "isPaused": {
+                          "type": "boolean"
+                        },
+                        "schedules": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "companionId": {
+                                "type": "integer"
+                              },
+                              "dayOfWeek": {
+                                "type": "integer"
+                              },
+                              "isAvailable": {
+                                "type": "boolean"
+                              },
+                              "startTime": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "endTime": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            }
+                          }
+                        },
+                        "oneTimeAvailabilities": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "companionId": {
+                                "type": "integer"
+                              },
+                              "date": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "startTime": {
+                                "type": "string"
+                              },
+                              "endTime": {
+                                "type": "string"
+                              },
+                              "location": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            }
+                          }
+                        },
+                        "blockedDates": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "companionId": {
+                                "type": "integer"
+                              },
+                              "startDate": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "endDate": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "reason": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/availability/weekly-schedule": {
+      "put": {
+        "tags": [
+          "Availability"
+        ],
+        "summary": "Update the weekly schedule",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "dayOfWeek": {
+                      "type": "integer",
+                      "description": "0=Sun, 1=Mon, ..., 6=Sat"
+                    },
+                    "isAvailable": {
+                      "type": "boolean"
+                    },
+                    "startTime": {
+                      "type": "string"
+                    },
+                    "endTime": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "example": [
+                {
+                  "dayOfWeek": 1,
+                  "isAvailable": true,
+                  "startTime": "18:00",
+                  "endTime": "22:00"
+                },
+                {
+                  "dayOfWeek": 3,
+                  "isAvailable": false,
+                  "startTime": null,
+                  "endTime": null
+                }
+              ]
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Weekly schedule updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/availability/settings": {
+      "put": {
+        "tags": [
+          "Availability"
+        ],
+        "summary": "Update buffer time and paused status",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "bookingBufferMin": {
+                    "type": "integer"
+                  },
+                  "isPaused": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "example": {
+                "bookingBufferMin": 60,
+                "isPaused": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Settings updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/availability/one-time": {
+      "post": {
+        "tags": [
+          "Availability"
+        ],
+        "summary": "Add a one-time availability",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "date": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "startTime": {
+                    "type": "string"
+                  },
+                  "endTime": {
+                    "type": "string"
+                  },
+                  "location": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "date": "2025-08-17T00:00:00.000Z",
+                "startTime": "12:00",
+                "endTime": "17:00",
+                "location": "Downtown Central"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "One-time availability added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "companionId": {
+                          "type": "integer"
+                        },
+                        "date": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "startTime": {
+                          "type": "string"
+                        },
+                        "endTime": {
+                          "type": "string"
+                        },
+                        "location": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/availability/one-time/{id}": {
+      "delete": {
+        "tags": [
+          "Availability"
+        ],
+        "summary": "Delete a one-time availability",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One-time availability removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/availability/blocked-date": {
+      "post": {
+        "tags": [
+          "Availability"
+        ],
+        "summary": "Add a blocked date range",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "startDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "endDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "startDate": "2025-08-11T00:00:00.000Z",
+                "endDate": "2025-08-17T00:00:00.000Z",
+                "reason": "Vacation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Blocked date added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "companionId": {
+                          "type": "integer"
+                        },
+                        "startDate": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "endDate": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "reason": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/availability/blocked-date/{id}": {
+      "delete": {
+        "tags": [
+          "Availability"
+        ],
+        "summary": "Delete a blocked date",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Blocked date removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/feed/impression/bulk": {
+      "post": {
+        "tags": [
+          "Feed"
+        ],
+        "summary": "Bulk log impressions of multiple companion cards",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "impressions": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "companionId": {
+                          "type": "integer"
+                        },
+                        "inTop3": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "example": {
+                "impressions": [
+                  {
+                    "companionId": 12,
+                    "inTop3": true
+                  },
+                  {
+                    "companionId": 45,
+                    "inTop3": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bulk impressions logged successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }

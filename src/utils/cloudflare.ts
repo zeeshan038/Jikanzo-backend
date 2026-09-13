@@ -14,6 +14,9 @@ export const s3 = new S3Client({
     },
 });
 
+/**
+ * @Description 
+ */
 export const uploadToCloudflare = async (fileBuffer: Buffer, mimetype: string, originalName: string) => {
     try {
         const bucketName = process.env.CLOUDFLARE_BUCKET_NAME || '';
@@ -81,5 +84,6 @@ export async function ensureR2UserFolders(cloudflareId: string) {
         createKeepFile(`${basePath}/profile-picture`),
         createKeepFile(`${basePath}/moments`),
         createKeepFile(`${basePath}/verification-assets`),
+        createKeepFile(`${basePath}/intros`),
     ]);
 }

@@ -41,30 +41,26 @@ export const getCompanionsFeed = async (req: Request, res: Response) => {
             };
         }
 
-        // if (gender) {
-        //     // Note: Needs 'gender' field in User model
-        //     whereClause.user.is.gender = (gender as string).toUpperCase();
-        // }
+        if (gender) {
+            whereClause.user.is.gender = {
+                equals: gender as string,
+                mode: 'insensitive'
+            };
+        }
 
         // if (location) {
-        //     // Note: Needs 'city' field in CompanionProfile
-        //     whereClause.city = {
-        //         equals: location as string,
-        //         mode: 'insensitive'
-        //     };
+        //     // Note: Needs 'city' field in CompanionProfile (currently only has locationLat/Lng)
         // }
 
-        // if (activityTypes) {
-        //     // Note: Needs 'activityTypes' String[] in CompanionProfile
-        //     const activities = (activityTypes as string).split(',');
-        //     whereClause.activityTypes = { hasSome: activities };
-        // }
+        if (activityTypes) {
+            const activities = (activityTypes as string).split(',');
+            whereClause.user.is.activityType = { hasSome: activities };
+        }
 
-        // if (languages) {
-        //     // Note: Needs 'languages' String[] in CompanionProfile
-        //     const langs = (languages as string).split(',');
-        //     whereClause.languages = { hasSome: langs };
-        // }
+        if (languages) {
+            const langs = (languages as string).split(',');
+            whereClause.user.is.languages = { hasSome: langs };
+        }
 
         if (trustRank) {
             const ranks = (trustRank as string).split(',');
@@ -87,8 +83,21 @@ export const getCompanionsFeed = async (req: Request, res: Response) => {
         // A full production system might use Elasticsearch or Redis for this
         const candidates = await prisma.companionProfile.findMany({
             where: whereClause,
-            include: {
-                user: true,
+            select: {
+                id: true,
+                userId: true,
+                bio: true,
+                jssScore: true,
+                completedMeetups: true,
+                locationLat: true,
+                locationLng: true,
+                user: {
+                    select: {
+                        id: true,
+                        username: true,
+                        profileImage: true
+                    }
+                },
                 ...(currentUserId ? { feedStats: { where: { userId: Number(currentUserId) } } } : {})
             },
             take: 100, // Fetch top 100 matching filters to rank
@@ -102,7 +111,7 @@ export const getCompanionsFeed = async (req: Request, res: Response) => {
             const completedMeetups = companion.completedMeetups || 0;
 
             let finalScore = jss * 0.20; // Base Quality
-            
+
             // Repeat Exposure Penalty (-2 points per impression)
             finalScore -= (impressionsLast24h * 2);
 
@@ -148,9 +157,9 @@ export const getCompanionsFeed = async (req: Request, res: Response) => {
         // Apply Pagination
         const paginated = interleaved.slice(Number(offset), Number(offset) + Number(limit));
 
-        // Remove walletBalance and extra fields from response
-        const sanitizedCompanions = paginated.map(companion => {
-            const { walletBalance, feedStats, finalScore, bucket, ...rest } = companion;
+        // Remove extra fields from response
+        const sanitizedCompanions = paginated.map((companion: any) => {
+            const { feedStats, finalScore, bucket, jssScore, completedMeetups, ...rest } = companion;
             return rest;
         });
 
@@ -168,6 +177,104 @@ export const getCompanionsFeed = async (req: Request, res: Response) => {
 };
 
 
+/**
+ * @Description Specific Companion
+ * @Route GET /api/feed/specific/:userId
+ * @Access Private
+ */
+export const specificCompanion = async (req: Request, res: Response): Promise<any> => {
+    try {
+        const { userId } = req.params;
+        const currentUserId = (req as any).user.id;
+
+        const companion = await prisma.companionProfile.findUnique({
+            where: { userId: Number(userId) },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        username: true,
+                        profileImage: true,
+                        age: true,
+                        gender: true,
+                        about: true,
+                        languages: true,
+                        activityType: true,
+                        gallery: true,
+                        intros: true
+                    }
+                },
+                reviews: {
+                    include: {
+                        client: {
+                            select: {
+                                id: true,
+                                username: true,
+                                profileImage: true
+                            }
+                        }
+                    },
+                    orderBy: { createdAt: 'desc' },
+                    take: 10
+                },
+                moments: true,
+                savedBy: {
+                    where: { userId: currentUserId }
+                }
+            }
+        });
+
+        if (!companion) {
+            return res.status(404).json({ status: false, msg: "Companion not found" });
+        }
+
+        // Calculate Moments Analytics
+        let totalLikes = 0;
+        let totalRings = 0;
+        let totalDiamonds = 0;
+
+        companion.moments.forEach(m => {
+            totalLikes += m.likes || 0;
+            totalRings += m.rings || 0;
+            totalDiamonds += m.diamonds || 0;
+        });
+
+        // Calculate Performance Stats
+        const totalSessions = companion.totalSessions || 0;
+        const repeatClients = companion.repeatClients || 0;
+        const repeatRate = totalSessions > 0 ? Math.round((repeatClients / totalSessions) * 100) : 0;
+
+        // Determine if saved
+        const isSaved = companion.savedBy && companion.savedBy.length > 0;
+
+        // Clean up the response
+        const { moments, savedBy, ...companionData } = companion;
+
+        const responseData = {
+            ...companionData,
+            isSaved,
+            momentsAnalytics: {
+                totalLikes,
+                totalRings,
+                totalDiamonds
+            },
+            performance: {
+                rating: companionData.rating,
+                totalSessions,
+                repeatClients,
+                repeatRate: `${repeatRate}%`
+            }
+        };
+
+        return res.status(200).json({
+            status: true,
+            msg: "Companion fetched successfully",
+            data: responseData
+        });
+    } catch (error: any) {
+        return res.status(500).json({ status: false, msg: error.message });
+    }
+};
 
 /**
  * @Description Toggle Save Companion
@@ -294,10 +401,6 @@ export const logImpression = async (req: Request, res: Response): Promise<any> =
             const top3Inc = inTop3 ? 1 : 0;
 
             if (stat) {
-                // If it's been more than 24h since last shown, we could reset it. 
-                // For now, let's just increment and assume a daily CRON job clears it, 
-                // or we check time difference. 
-                // Simple version: just increment
                 await tx.feedStat.update({
                     where: { id: stat.id },
                     data: {
@@ -319,8 +422,81 @@ export const logImpression = async (req: Request, res: Response): Promise<any> =
             }
         });
 
-        return res.status(200).json({ status: true, msg: "Impression logged successfully" });
+        return res.status(200).json({
+            status: true,
+            msg: "Impression logged successfully"
+        });
     } catch (error: any) {
-        return res.status(500).json({ status: false, msg: error.message });
+        return res.status(500).json({
+            status: false,
+            msg: error.message
+        });
+    }
+};
+
+/**
+ * @Description Bulk Log impressions of multiple companion cards
+ * @Route POST /api/feed/impression/bulk
+ * @Access Private
+ */
+export const logImpressionBulk = async (req: Request, res: Response): Promise<any> => {
+    const userId = (req as any).user.id;
+    const { impressions } = req.body;
+
+    if (!impressions || !Array.isArray(impressions) || impressions.length === 0) {
+        return res.status(400).json({ status: false, msg: "impressions array is required" });
+    }
+
+    try {
+        await prisma.$transaction(async (tx) => {
+
+            const companionIds = impressions.map((imp: any) => Number(imp.companionId));
+
+            const existingStats = await tx.feedStat.findMany({
+                where: {
+                    userId: Number(userId),
+                    companionId: { in: companionIds }
+                }
+            });
+
+            const existingMap = new Map(existingStats.map(s => [s.companionId, s]));
+
+            for (const imp of impressions) {
+                const compId = Number(imp.companionId);
+                const stat = existingMap.get(compId);
+                const top3Inc = imp.inTop3 ? 1 : 0;
+
+                if (stat) {
+                    await tx.feedStat.update({
+                        where: { id: stat.id },
+                        data: {
+                            impressionsLast24h: { increment: 1 },
+                            top3AppearancesLast24h: { increment: top3Inc },
+                            lastShownAt: new Date()
+                        }
+                    });
+                } else {
+                    await tx.feedStat.create({
+                        data: {
+                            userId: Number(userId),
+                            companionId: compId,
+                            impressionsLast24h: 1,
+                            top3AppearancesLast24h: top3Inc,
+                            lastShownAt: new Date()
+                        }
+                    });
+                }
+            }
+        });
+
+        return res.status(200).json({
+            status: true,
+            msg: "Bulk impressions logged successfully"
+        });
+    } catch (error: any) {
+        return res.status(500).json({
+            status: false,
+            msg: error.message
+        });
     }
 };

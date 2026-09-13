@@ -17,7 +17,8 @@ import {
 import { genrateToken } from '../../utils/methods';
 import {
     generateUniqueCloudflareId,
-    ensureR2UserFolders
+    ensureR2UserFolders,
+    uploadToCloudflare
 } from '../../utils/cloudflare';
 
 
@@ -400,6 +401,14 @@ export const updateProfile = async (req: Request, res: Response): Promise<any> =
         if (payload.gallery !== undefined) updateData.gallery = payload.gallery;
         if (payload.intros !== undefined) updateData.intros = payload.intros;
 
+        if (payload.serviceRadius !== undefined) {
+            updateData.companionProfile = {
+                update: {
+                    serviceRadius: payload.serviceRadius
+                }
+            };
+        }
+
         if (updateData.username) {
             const existingUser = await prisma.user.findFirst({
                 where: {
@@ -582,6 +591,48 @@ export const UpdateFcm = async (req: Request, res: Response): Promise<any> =>{
         return res.status(200).json({
             status: true,
             msg: "FCM token updated successfully"
+        });
+    } catch (error: any) {
+        return res.status(500).json({
+            status: false,
+            msg: error.message
+        });
+    }
+}
+
+
+/**
+ * @Description Upload Galery
+ * @Method POST api/user/upload-gallery
+ * @Access Private
+ */
+export const uploadGallery = async (req: Request, res: Response): Promise<any> => {
+    const userId = (req as any).user?.id;
+    
+    try {
+        const { images } = req.body;
+
+        if (!images || !Array.isArray(images) || images.length === 0) {
+            return res.status(400).json({
+                status: false,
+                msg: "No image URLs provided for gallery."
+            });
+        }
+
+        // Append the array of uploaded URLs to the user's gallery field
+        await prisma.user.update({
+            where: { id: userId },
+            data: {
+                gallery: {
+                    push: images
+                }
+            }
+        });
+
+        return res.status(200).json({
+            status: true,
+            msg: "Gallery updated successfully",
+            urls: images
         });
     } catch (error: any) {
         return res.status(500).json({
