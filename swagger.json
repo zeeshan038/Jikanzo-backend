@@ -1115,17 +1115,17 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "number",
+              "type": "integer",
               "default": 10
             }
           },
           {
-            "name": "offset",
+            "name": "page",
             "in": "query",
             "required": false,
             "schema": {
-              "type": "number",
-              "default": 0
+              "type": "integer",
+              "default": 1
             }
           }
         ],
@@ -1147,6 +1147,23 @@
                       "type": "array",
                       "items": {
                         "$ref": "#/components/schemas/CompanionDto"
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "page": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "totalPages": {
+                          "type": "integer"
+                        }
                       }
                     }
                   }
@@ -1488,7 +1505,100 @@
                     ],
                     "intros": [
                       "https://cdn.jikanzo.com/users/jane_intro_video.mp4"
-                    ]
+                    ],
+                    "profileProgress": 100
+                  }
+                },
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "username": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "type": "string"
+                        },
+                        "role": {
+                          "type": "string"
+                        },
+                        "profileImage": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "about": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "languages": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityType": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "savedLocations": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "lat": {
+                                "type": "number"
+                              },
+                              "lng": {
+                                "type": "number"
+                              }
+                            }
+                          }
+                        },
+                        "gender": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "age": {
+                          "type": "integer",
+                          "nullable": true
+                        },
+                        "walletBalance": {
+                          "type": "number"
+                        },
+                        "gallery": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "intros": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "profileProgress": {
+                          "type": "integer",
+                          "description": "Percentage of profile completeness (0-100)"
+                        }
+                      }
+                    }
                   }
                 }
               }

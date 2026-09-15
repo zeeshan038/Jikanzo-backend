@@ -484,10 +484,27 @@ export const whoami = async (req: Request, res: Response): Promise<any> => {
             });
         }
 
+        let filledFields = 0;
+        const totalFields = 8;
+        
+        if (user.profileImage) filledFields++;
+        if (user.username) filledFields++;
+        if (user.about) filledFields++;
+        if (user.gender) filledFields++;
+        if (user.age) filledFields++;
+        if (user.languages && user.languages.length > 0) filledFields++;
+        if (user.activityType && user.activityType.length > 0) filledFields++;
+        if (user.gallery && user.gallery.length > 0) filledFields++;
+
+        const profileProgress = Math.round((filledFields / totalFields) * 100);
+
         return res.status(200).json({
             status: true,
             msg: "User profile fetched successfully",
-            user
+            user: {
+                ...user,
+                profileProgress
+            }
         });
     } catch (error: any) {
         return res.status(500).json({

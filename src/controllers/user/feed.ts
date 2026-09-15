@@ -17,10 +17,12 @@ export const getCompanionsFeed = async (req: Request, res: Response) => {
         trustRank,
         rating,
         minPrice,
-        maxPrice,
-        limit = 10,
-        offset = 0
+        maxPrice
     } = req.query;
+
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const skip = (page - 1) * limit;
 
 
     try {
@@ -155,7 +157,8 @@ export const getCompanionsFeed = async (req: Request, res: Response) => {
         }
 
         // Apply Pagination
-        const paginated = interleaved.slice(Number(offset), Number(offset) + Number(limit));
+        const total = interleaved.length;
+        const paginated = interleaved.slice(skip, skip + limit);
 
         // Remove extra fields from response
         const sanitizedCompanions = paginated.map((companion: any) => {
@@ -166,7 +169,13 @@ export const getCompanionsFeed = async (req: Request, res: Response) => {
         return res.status(200).json({
             status: true,
             msg: "Companions fetched successfully",
-            data: sanitizedCompanions
+            data: sanitizedCompanions,
+            pagination: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit)
+            }
         });
     } catch (error: any) {
         res.status(500).json({
