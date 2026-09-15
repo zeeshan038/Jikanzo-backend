@@ -149,6 +149,29 @@ async function main() {
       });
     }
 
+    // Create moments for the companion
+    const numMoments = getRandomInt(1, 3);
+    for (let m = 0; m < numMoments; m++) {
+      const createdAt = new Date();
+      createdAt.setHours(createdAt.getHours() - getRandomInt(0, 12)); // past 12 hours
+      
+      const expiresAt = new Date(createdAt);
+      expiresAt.setHours(expiresAt.getHours() + 24); // valid for 24 hours
+
+      await prisma.moment.create({
+        data: {
+          companionId: companion.companionProfile!.id,
+          mediaUrl: `https://picsum.photos/seed/${i * 10 + m}/600/800`,
+          caption: `Having a great time! #${m + 1}`,
+          likes: getRandomInt(10, 500),
+          diamonds: getRandomInt(0, 50),
+          rings: getRandomInt(0, 10),
+          createdAt: createdAt,
+          expiresAt: expiresAt,
+        }
+      });
+    }
+
     console.log(`Created companion ${i + 1}/30: ${username} with ${numReviews} reviews`);
   }
 
