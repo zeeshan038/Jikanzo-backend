@@ -1704,7 +1704,37 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateBookingRequest"
+                "type": "object",
+                "properties": {
+                  "date": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "startTime": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "endTime": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "latitude": {
+                    "type": "number"
+                  },
+                  "longitude": {
+                    "type": "number"
+                  },
+                  "address": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "date",
+                  "startTime",
+                  "endTime",
+                  "latitude",
+                  "longitude"
+                ]
               }
             }
           }
@@ -1716,6 +1746,19 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MessageResponse"
+                },
+                "example": {
+                  "status": true,
+                  "msg": "Booking request created successfully",
+                  "data": {
+                    "id": 1,
+                    "clientId": 12,
+                    "companionId": 5,
+                    "date": "2024-11-20T00:00:00.000Z",
+                    "startTime": "2024-11-20T18:00:00.000Z",
+                    "endTime": "2024-11-20T22:00:00.000Z",
+                    "status": "PENDING"
+                  }
                 }
               }
             }
@@ -1769,7 +1812,24 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AcceptBookingRequest"
+                "type": "object",
+                "properties": {
+                  "bookingId": {
+                    "type": "integer"
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "ACCEPT",
+                      "DECLINE",
+                      "CANCEL"
+                    ]
+                  }
+                },
+                "required": [
+                  "bookingId",
+                  "action"
+                ]
               }
             }
           }
@@ -1781,6 +1841,10 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MessageResponse"
+                },
+                "example": {
+                  "status": true,
+                  "msg": "Booking accepted successfully"
                 }
               }
             }
@@ -1834,7 +1898,19 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CompleteBookingRequest"
+                "type": "object",
+                "properties": {
+                  "bookingId": {
+                    "type": "integer"
+                  },
+                  "otp": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "bookingId",
+                  "otp"
+                ]
               }
             }
           }
@@ -1846,6 +1922,14 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MessageResponse"
+                },
+                "example": {
+                  "status": true,
+                  "msg": "Booking completed successfully",
+                  "data": {
+                    "id": 1,
+                    "status": "COMPLETED"
+                  }
                 }
               }
             }
@@ -1899,7 +1983,15 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PayWithWalletRequest"
+                "type": "object",
+                "properties": {
+                  "bookingId": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "bookingId"
+                ]
               }
             }
           }
@@ -1911,6 +2003,10 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MessageResponse"
+                },
+                "example": {
+                  "status": true,
+                  "msg": "Payment successful"
                 }
               }
             }
