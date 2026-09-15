@@ -18,13 +18,23 @@ const languagesList = ['English', 'Spanish', 'French', 'German', 'Italian', 'Jap
 const activitiesList = ['Dinner', 'Coffee', 'Movies', 'Museum', 'Concert', 'Hiking', 'Shopping', 'City Tour', 'Gaming', 'Bowling'];
 const genders = ['Female', 'Male', 'Non-binary'];
 const trustRanks = ['New', 'Verified', 'Premium', 'Elite'];
+const reviewComments = [
+  "Amazing experience, highly recommended!",
+  "Very friendly and easy to talk to.",
+  "Had a wonderful time exploring the city.",
+  "Great listener and fantastic company.",
+  "Would definitely book again!",
+  "A perfect companion for the evening.",
+  "Very punctual and engaging.",
+  "Made my trip unforgettable."
+];
 
 function getRandomItem<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
 function getRandomItems<T>(arr: T[], count: number): T[] {
-  const shuffled = arr.sort(() => 0.5 - Math.random());
+  const shuffled = [...arr].sort(() => 0.5 - Math.random());
   return shuffled.slice(0, count);
 }
 
@@ -38,7 +48,25 @@ function getRandomFloat(min: number, max: number, decimals: number = 1) {
 }
 
 async function main() {
-  console.log('Starting seeding of 30 companions...');
+  console.log('Starting seeding process...');
+
+  // Create some dummy clients first for reviews
+  const clients = [];
+  for (let i = 0; i < 5; i++) {
+    const client = await prisma.user.upsert({
+      where: { username: `client_user_${i}` },
+      update: {},
+      create: {
+        username: `client_user_${i}`,
+        phone: `+1${Math.floor(1000000000 + Math.random() * 9000000000)}`,
+        role: 'CLIENT',
+        about: 'I am a client looking for great experiences.',
+        profileImage: `https://i.pravatar.cc/300?img=${i + 10}`,
+      },
+    });
+    clients.push(client);
+  }
+  console.log(`Created ${clients.length} clients for reviews.`);
 
   for (let i = 0; i < 30; i++) {
     const firstName = firstNames[i];
@@ -49,7 +77,7 @@ async function main() {
     const hourlyRate = getRandomInt(30, 150);
     const isOnline = Math.random() > 0.5;
     
-    // Distribute locations around a general area (e.g. Los Angeles)
+    // Distribute locations around Los Angeles
     const locationLat = getRandomFloat(33.7, 34.3, 4);
     const locationLng = getRandomFloat(-118.6, -117.8, 4);
     
@@ -58,7 +86,18 @@ async function main() {
     const gender = getRandomItem(genders);
     const trustRank = getRandomItem(trustRanks);
 
-    await prisma.user.upsert({
+    const profileImage = `https://i.pravatar.cc/600?img=${i + 15}`;
+    const gallery = [
+      `https://i.pravatar.cc/600?img=${i + 20}`,
+      `https://i.pravatar.cc/600?img=${i + 30}`,
+      `https://i.pravatar.cc/600?img=${i + 40}`
+    ];
+    const intros = [
+      "Hi, I'm excited to meet you! Check out my intro.",
+      "Looking forward to a great time together."
+    ];
+
+    const companion = await prisma.user.upsert({
       where: { username },
       update: {},
       create: {
@@ -70,6 +109,9 @@ async function main() {
         activityType: companionActivities,
         gender: gender,
         age: age,
+        profileImage: profileImage,
+        gallery: gallery,
+        intros: intros,
         companionProfile: {
           create: {
             bio: `I am a ${trustRank.toLowerCase()} companion looking forward to spending time with you.`,
@@ -88,9 +130,26 @@ async function main() {
           },
         },
       },
+      include: {
+        companionProfile: true
+      }
     });
 
-    console.log(`Created companion ${i + 1}/30: ${username}`);
+    // Create reviews for the companion
+    const numReviews = getRandomInt(1, 4);
+    for (let r = 0; r < numReviews; r++) {
+      const client = getRandomItem(clients);
+      await prisma.review.create({
+        data: {
+          clientId: client.id,
+          companionId: companion.companionProfile!.id,
+          rating: getRandomInt(4, 5),
+          comment: getRandomItem(reviewComments),
+        }
+      });
+    }
+
+    console.log(`Created companion ${i + 1}/30: ${username} with ${numReviews} reviews`);
   }
 
   console.log('Seeding finished.');

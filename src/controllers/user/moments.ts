@@ -49,14 +49,18 @@ export const createMoment = async (req: Request, res: Response): Promise<any> =>
  */
 export const getFeedMoments = async (req: Request, res: Response): Promise<any> => {
     const userId = (req as any).user.id;
-    const { type, lat, lng, radius } = req.query; // type can be 'saved' or 'nearby'
+    const { type, lat, lng, radius } = req.query;
+
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const skip = (page - 1) * limit;
 
     try {
         const now = new Date();
-        let companionIdsToFetch: number[] | null = null; // null means fetch all active, array means filter
+        let companionIdsToFetch: number[] | null = null; 
         let userLat = Number(lat);
         let userLng = Number(lng);
-        let searchRadius = Number(radius) || 50; // default 50km
+        let searchRadius = Number(radius) || 50; 
 
         // If type is not explicitly 'nearby', default to 'saved'
         if (type !== 'nearby') {
@@ -84,6 +88,10 @@ export const getFeedMoments = async (req: Request, res: Response): Promise<any> 
         let moments = await prisma.moment.findMany({
             where: whereClause,
             include: {
+                views: {
+                    where: { userId: Number(userId) },
+                    select: { id: true }
+                },
                 companion: {
                     include: {
                         user: {
@@ -111,20 +119,49 @@ export const getFeedMoments = async (req: Request, res: Response): Promise<any> 
             });
         }
 
-        const formatted = moments.map(m => ({
-            momentId: m.id,
-            mediaUrl: m.mediaUrl,
-            caption: m.caption,
-            createdAt: m.createdAt,
-            expiresAt: m.expiresAt,
-            companion: {
-                companionId: m.companionId,
-                username: m.companion.user.username,
-                profileImage: m.companion.user.profileImage
-            }
-        }));
+        // Group by companion
+        const groupedMap = new Map<number, any>();
 
-        return res.status(200).json({ status: true, data: formatted });
+        for (const m of moments) {
+            const compId = m.companionId;
+            if (!groupedMap.has(compId)) {
+                groupedMap.set(compId, {
+                    companionId: compId,
+                    username: m.companion.user.username,
+                    profileImage: m.companion.user.profileImage,
+                    allSeen: true,
+                    moments: []
+                });
+            }
+
+            const compData = groupedMap.get(compId);
+            const isSeen = m.views.length > 0;
+            
+            if (!isSeen) {
+                compData.allSeen = false;
+            }
+
+            compData.moments.push({
+                momentId: m.id,
+                mediaUrl: m.mediaUrl,
+                caption: m.caption,
+                createdAt: m.createdAt,
+                expiresAt: m.expiresAt,
+                isSeen
+            });
+        }
+
+        const formatted = Array.from(groupedMap.values());
+
+        // Apply pagination after grouping
+        const total = formatted.length;
+        const paginated = formatted.slice(skip, skip + limit);
+
+        return res.status(200).json({ 
+            status: true, 
+            data: paginated,
+            pagination: { total, page, limit, totalPages: Math.ceil(total / limit) }
+        });
     } catch (error: any) {
         return res.status(500).json({ status: false, msg: error.message });
     }
@@ -203,6 +240,114 @@ export const appreciateMoment = async (req: Request, res: Response): Promise<any
         });
 
         return res.status(200).json({ status: true, msg: `Appreciated with ${type}`, data: updated });
+    } catch (error: any) {
+        return res.status(500).json({ status: false, msg: error.message });
+    }
+};
+
+/**
+ * @Description Mark a Moment as Seen
+ * @Route POST /api/moments/:id/seen
+ * @Access Private
+ */
+export const markMomentAsSeen = async (req: Request, res: Response): Promise<any> => {
+    const userId = (req as any).user.id;
+    const momentId = req.params.id;
+
+    try {
+        const moment = await prisma.moment.findUnique({
+            where: { id: Number(momentId) }
+        });
+
+        if (!moment) {
+            return res.status(404).json({ status: false, msg: "Moment not found" });
+        }
+
+        // Upsert to ignore if it already exists (@@unique constraint)
+        await prisma.momentView.upsert({
+            where: {
+                userId_momentId: {
+                    userId: Number(userId),
+                    momentId: Number(momentId)
+                }
+            },
+            update: {},
+            create: {
+                userId: Number(userId),
+                momentId: Number(momentId)
+            }
+        });
+
+        return res.status(200).json({ status: true, msg: "Moment marked as seen" });
+    } catch (error: any) {
+        return res.status(500).json({ status: false, msg: error.message });
+    }
+};
+
+
+
+/**
+ * @Description Companion can see all of his posted moments with likes 
+ * @Route GET /api/moments/all
+ * @Access Private
+ */
+export const getCompanionMoments = async (req: Request, res: Response): Promise<any> => {
+    const userId = (req as any).user.id;
+    
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const skip = (page - 1) * limit;
+
+    try {
+        const companionProfile = await prisma.companionProfile.findFirst({
+            where: { userId: Number(userId) }
+        });
+
+        if (!companionProfile) {
+            return res.status(404).json({ status: false, msg: "Companion profile not found" });
+        }
+
+        const total = await prisma.moment.count({ where: { companionId: companionProfile.id } });
+
+        const moments = await prisma.moment.findMany({
+            where: { companionId: companionProfile.id },
+            select: {
+                id: true,
+                mediaUrl: true,
+                caption: true,
+                likes: true,
+                diamonds: true,
+                rings: true,
+                createdAt: true,
+                expiresAt: true,
+                _count: {
+                    select: { views: true }
+                }
+            },
+            orderBy: { createdAt: 'desc' },
+            take: limit,
+            skip: skip
+        });
+
+        // Format to move _count.views to a flat viewCount property for convenience
+        const formatted = moments.map(m => ({
+            id: m.id,
+            mediaUrl: m.mediaUrl,
+            caption: m.caption,
+            likes: m.likes,
+            diamonds: m.diamonds,
+            rings: m.rings,
+            createdAt: m.createdAt,
+            expiresAt: m.expiresAt,
+            viewCount: m._count.views
+        }));
+
+        return res.status(200).json({ 
+            status: true, 
+            msg: "Moments fetched successfully", 
+            data: formatted,
+            pagination: { total, page, limit, totalPages: Math.ceil(total / limit) }
+        });
     } catch (error: any) {
         return res.status(500).json({ status: false, msg: error.message });
     }

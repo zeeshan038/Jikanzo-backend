@@ -35,6 +35,7 @@ model User {
   
   companionProfile CompanionProfile?
   clientBookings   Booking[]         @relation("ClientBookings")
+  momentViews      MomentView[]
   clientReviews    Review[]          @relation("ClientReviews")
   walletTransactions WalletTransaction[]
   savedCompanions  SavedCompanion[]  @relation("UserSavedCompanions")
@@ -87,8 +88,12 @@ model Booking {
   date         DateTime
   startTime    DateTime
   endTime      DateTime
+  latitude     Float?
+  longitude    Float?
+  address      String?
   status       String   @default("PENDING") // PENDING, ACTIVE, COMPLETED, CANCELLED
   totalAmount  Float?
+  otp          String?
   paymentStatus String  @default("PENDING") // PENDING, PAID, FAILED
   stripePaymentIntentId String?
   cancelledById Int?
@@ -162,6 +167,19 @@ model Moment {
   expiresAt   DateTime
 
   companion   CompanionProfile @relation("CompanionMoments", fields: [companionId], references: [id])
+  views       MomentView[]
+}
+
+model MomentView {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  momentId  Int
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moment    Moment   @relation(fields: [momentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, momentId])
 }
 
 model FeedStat {

@@ -10,41 +10,61 @@ import { calculateJSS } from "../../utils/jssCalculator";
  * @Access Private
  */
 export const bookCompanion = async (req: Request, res: Response) => {
-    const payload = req.body;
-    const {id:clientId} = req.user;
-    const {id:companionId} = req.params;
-  
-      const result = createBooking.validate(payload);
-      if (result.error) {
-          const errors = result.error.details.map((d: any) => d.message).join(",");
-          return res.status(400).json({
-              status: false,
-              msg: errors
-          });
-      }
+  const payload = req.body;
+  const { id: clientId } = req.user;
+  const { id: companionId } = req.params;
+
+  const result = createBooking.validate(payload);
+  if (result.error) {
+    const errors = result.error.details.map((d: any) => d.message).join(",");
+    return res.status(400).json({
+      status: false,
+      msg: errors
+    });
+  }
 
   try {
 
-    const { date, startTime, endTime } = result.value;
+
 
     const companion = await prisma.companionProfile.findUnique({
-      where: { id: Number(companionId) }
+      where: { id: Number(companionId) },
+      include: { user: true } // Include user to get the companion's user details for notification
     });
 
     if (!companion) {
       return res.status(404).json({ status: false, msg: "Companion not found" });
     }
 
+    // Generate a 4-digit OTP
+    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+
     const booking = await prisma.booking.create({
       data: {
         clientId,
         companionId: Number(companionId),
-        date: new Date(date),
-        startTime: new Date(startTime),
-        endTime: new Date(endTime),
-        status: "PENDING"
+        date: new Date(payload.date),
+        startTime: new Date(payload.startTime),
+        endTime: new Date(payload.endTime),
+        latitude: payload.latitude,
+        longitude: payload.longitude,
+        address: payload.address,
+        status: "PENDING",
+        otp // Save OTP in DB
       }
     });
+
+    // Send push notification to the companion
+    import('../../utils/notification').then(({ sendPushNotification }) => {
+      if (companion.userId) {
+        sendPushNotification(
+          companion.userId,
+          "New Booking Request",
+          "You have received a new booking request.",
+          { bookingId: booking.id }
+        );
+      }
+    }).catch(err => console.error("Failed to send notification:", err));
 
     return res.status(201).json({
       status: true,
@@ -53,9 +73,9 @@ export const bookCompanion = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     res.status(500).json({
-       status: false, 
-       msg:error.message 
-     });
+      status: false,
+      msg: error.message
+    });
   }
 };
 
@@ -69,13 +89,13 @@ export const acceptBookingController = async (req: Request, res: Response) => {
 
   const result = acceptBooking.validate(payload);
 
-   if (result.error) {
-          const errors = result.error.details.map((d: any) => d.message).join(",");
-          return res.status(400).json({
-              status: false,
-              msg: errors
-          });
-      }
+  if (result.error) {
+    const errors = result.error.details.map((d: any) => d.message).join(",");
+    return res.status(400).json({
+      status: false,
+      msg: errors
+    });
+  }
 
   try {
 
@@ -89,28 +109,28 @@ export const acceptBookingController = async (req: Request, res: Response) => {
 
     if (!booking) {
       return res.status(404).json({
-         status: false, 
-         msg: "Booking not found" 
-        });
+        status: false,
+        msg: "Booking not found"
+      });
     }
 
     const newStatus = action === 'ACCEPT' ? 'ACCEPTED' : 'CANCELLED';
 
     const updateData: any = { status: newStatus };
-    
+
     // If it's cancelled, log who cancelled it. Also apply reliability penalty if companion responsible
     if (newStatus === 'CANCELLED') {
       const isCompanion = (req as any).user?.id === booking.companion.userId;
       updateData.cancelledById = (req as any).user?.id;
-      
+
       if (isCompanion) {
-         // Decrease reliability score by 10 (configurable)
-         await prisma.companionProfile.update({
-            where: { id: booking.companionId },
-            data: {
-               reliabilityScore: { decrement: 10 }
-            }
-         });
+        // Decrease reliability score by 10 (configurable)
+        await prisma.companionProfile.update({
+          where: { id: booking.companionId },
+          data: {
+            reliabilityScore: { decrement: 10 }
+          }
+        });
       }
     }
 
@@ -121,20 +141,19 @@ export const acceptBookingController = async (req: Request, res: Response) => {
 
     // Trigger JSS Recalculation if it's a cancellation
     if (newStatus === 'CANCELLED') {
-        // Run asynchronously
-        calculateJSS(booking.companionId).catch(err => console.error("JSS Calculation Error:", err));
+      // Run asynchronously
+      calculateJSS(booking.companionId).catch(err => console.error("JSS Calculation Error:", err));
     }
 
     return res.status(200).json({
       status: true,
-      msg: `Booking ${action.toLowerCase()}ed successfully`,
-      data: updatedBooking
+      msg: `Booking ${action.toLowerCase()}ed successfully`
     });
   } catch (error: any) {
     res.status(500).json({
-       status: false, 
-       msg: error.message 
-     });
+      status: false,
+      msg: error.message
+    });
   }
 };
 
@@ -144,35 +163,38 @@ export const acceptBookingController = async (req: Request, res: Response) => {
  * @Access Private
  */
 export const completeBookingController = async (req: Request, res: Response) => {
-  const { bookingId } = req.body;
-  
+  const { bookingId, otp } = req.body;
+
   try {
-     const booking = await prisma.booking.findUnique({
-        where: { id: bookingId }
-     });
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId }
+    });
 
-     if (!booking) {
-        return res.status(404).json({ status: false, msg: "Booking not found" });
-     }
+    if (!booking) {
+      return res.status(404).json({ status: false, msg: "Booking not found" });
+    }
 
-     const updatedBooking = await prisma.booking.update({
-        where: { id: bookingId },
-        data: { status: 'COMPLETED' }
-     });
+    if (booking.otp !== otp) {
+      return res.status(400).json({ status: false, msg: "Invalid OTP provided" });
+    }
 
-     // Trigger JSS Recalculation asynchronously
-     calculateJSS(booking.companionId).catch(err => console.error("JSS Calculation Error:", err));
+    const updatedBooking = await prisma.booking.update({
+      where: { id: bookingId },
+      data: { status: 'COMPLETED' }
+    });
 
-     return res.status(200).json({
-        status: true,
-        msg: "Booking completed successfully",
-        data: updatedBooking
-     });
+    // Trigger JSS Recalculation asynchronously
+    calculateJSS(booking.companionId).catch(err => console.error("JSS Calculation Error:", err));
+
+    return res.status(200).json({
+      status: true,
+      msg: "Booking completed successfully",
+      data: updatedBooking
+    });
   } catch (error: any) {
-     res.status(500).json({ status: false, msg: error.message });
+    res.status(500).json({ status: false, msg: error.message });
   }
 };
-
 
 
 /**
@@ -203,7 +225,7 @@ export const payWithWallet = async (req: Request, res: Response) => {
 
     if (booking.status !== 'PENDING') {
       return res.status(400).json({ status: false, msg: "Booking is not in a payable state" });
-    } 
+    }
 
     if (booking.paymentStatus === 'PAID') {
       return res.status(400).json({ status: false, msg: "Booking is already paid" });
@@ -281,3 +303,121 @@ export const payWithWallet = async (req: Request, res: Response) => {
   }
 };
 
+
+/**
+ * @Description Get client bookings (history, upcoming, requests)
+ * @Route GET /api/booking/client?type=requests
+ * @Access Private
+ */
+export const getClientBookings = async (req: Request, res: Response) => {
+  const userId = req.user.id;
+  const { type } = req.query;
+
+  try {
+    const whereClause: any = { clientId: userId };
+
+    if (type === 'requests') {
+      whereClause.status = 'PENDING';
+    } else if (type === 'upcoming') {
+      whereClause.status = { in: ['ACCEPTED', 'ACTIVE'] };
+    } else if (type === 'history') {
+      whereClause.status = { in: ['COMPLETED', 'CANCELLED'] };
+    }
+
+    const bookings = await prisma.booking.findMany({
+      where: whereClause,
+      select: {
+        id: true,
+        status: true,
+        date: true,
+        startTime: true,
+        endTime: true,
+        address: true,
+        totalAmount: true,
+        otp: true,
+        cancellationReason: true,
+        companion: {
+          select: {
+            id: true,
+            user: {
+              select: { username: true, profileImage: true }
+            }
+          }
+        }
+      },
+      orderBy: { date: 'desc' }
+    });
+
+    return res.status(200).json({
+      status: true,
+      msg: "Client bookings fetched successfully",
+      data: bookings
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      status: false,
+      msg: error.message
+    });
+  }
+};
+
+
+/**
+ * @Description Get companion bookings (history, upcoming, requests)
+ * @Route GET /api/booking/companion?type=requests
+ * @Access Private
+ */
+export const getCompanionBookings = async (req: Request, res: Response) => {
+  const userId = req.user.id;
+  const { type } = req.query;
+
+  try {
+    const companionProfile = await prisma.companionProfile.findFirst({
+      where: { userId }
+    });
+
+    if (!companionProfile) {
+      return res.status(404).json({ status: false, msg: "Companion profile not found" });
+    }
+
+    const whereClause: any = { companionId: companionProfile.id };
+
+    if (type === 'requests') {
+      whereClause.status = 'PENDING';
+    } else if (type === 'upcoming') {
+      whereClause.status = { in: ['ACCEPTED', 'ACTIVE'] };
+    } else if (type === 'history') {
+      whereClause.status = { in: ['COMPLETED', 'CANCELLED'] };
+    }
+
+    const bookings = await prisma.booking.findMany({
+      where: whereClause,
+      select: {
+        id: true,
+        status: true,
+        date: true,
+        startTime: true,
+        endTime: true,
+        address: true,
+        totalAmount: true,
+        otp: true,
+        cancellationReason: true,
+        client: {
+          select: { id: true, username: true, profileImage: true }
+        }
+      },
+      orderBy: { date: 'desc' }
+    });
+
+    return res.status(200).json({
+      status: true,
+      msg: "Companion bookings fetched successfully",
+      data: bookings
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      status: false,
+      msg: error.message
+    });
+  }
+};

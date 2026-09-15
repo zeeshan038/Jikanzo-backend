@@ -9,6 +9,7 @@ import prisma from './config/db';
 
 //Paths
 import routes from './routes/user/index';
+import './cron/booking';
 
 const app = express();
 

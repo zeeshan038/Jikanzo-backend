@@ -21,6 +21,7 @@
     "joi": "^18.2.5",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.3.0",
+    "node-cron": "^4.6.0",
     "stripe": "^22.6.0",
     "swagger-ui-express": "^5.0.1"
   },
@@ -30,6 +31,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.2.0",
     "@types/node": "^20.12.7",
+    "@types/node-cron": "^3.0.11",
     "@types/supertest": "^7.2.1",
     "@types/swagger-ui-express": "^4.1.8",
     "nodemon": "^3.1.0",

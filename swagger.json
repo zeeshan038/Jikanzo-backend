@@ -176,7 +176,7 @@
           },
           "hourlyRate": {
             "type": "number",
-            "example": 50.0
+            "example": 50
           },
           "locationLat": {
             "type": "number",
@@ -1349,8 +1349,8 @@
               }
             }
           },
-          "404": {
-            "description": "Companion not found",
+          "401": {
+            "description": "Unauthorized - Missing or Invalid Token",
             "content": {
               "application/json": {
                 "schema": {
@@ -1359,8 +1359,8 @@
               }
             }
           },
-          "401": {
-            "description": "Unauthorized - Missing or Invalid Token",
+          "404": {
+            "description": "Companion not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -2883,6 +2883,417 @@
             }
           }
         }
+      }
+    },
+    "/api/booking/client": {
+      "get": {
+        "tags": [
+          "Booking"
+        ],
+        "summary": "Get Client Bookings",
+        "description": "Get all bookings where the user is the client",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "type",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "requests",
+                "upcoming",
+                "history"
+              ]
+            },
+            "description": "Filter bookings by type"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bookings fetched successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/booking/companion": {
+      "get": {
+        "tags": [
+          "Booking"
+        ],
+        "summary": "Get Companion Bookings",
+        "description": "Get all bookings where the user is the companion",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "type",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "requests",
+                "upcoming",
+                "history"
+              ]
+            },
+            "description": "Filter bookings by type"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bookings fetched successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/moments/feed": {
+      "get": {
+        "tags": [
+          "Moments"
+        ],
+        "summary": "Get Moments Feed",
+        "description": "Get the grouped moments feed for the user, separated by companion.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "saved",
+                "nearby"
+              ]
+            },
+            "description": "Filter type: saved or nearby"
+          },
+          {
+            "in": "query",
+            "name": "lat",
+            "required": false,
+            "schema": {
+              "type": "number"
+            },
+            "description": "Latitude for nearby"
+          },
+          {
+            "in": "query",
+            "name": "lng",
+            "required": false,
+            "schema": {
+              "type": "number"
+            },
+            "description": "Longitude for nearby"
+          },
+          {
+            "in": "query",
+            "name": "radius",
+            "required": false,
+            "schema": {
+              "type": "number"
+            },
+            "description": "Search radius in km"
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "description": "Page number for pagination"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 10
+            },
+            "description": "Number of items per page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Feed fetched successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "companionId": {
+                            "type": "integer"
+                          },
+                          "username": {
+                            "type": "string"
+                          },
+                          "profileImage": {
+                            "type": "string"
+                          },
+                          "allSeen": {
+                            "type": "boolean"
+                          },
+                          "moments": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "momentId": {
+                                  "type": "integer"
+                                },
+                                "mediaUrl": {
+                                  "type": "string"
+                                },
+                                "caption": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "createdAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "expiresAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "isSeen": {
+                                  "type": "boolean"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "page": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "totalPages": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/moments/seen/{id}": {
+      "post": {
+        "tags": [
+          "Moments"
+        ],
+        "summary": "Mark Moment as Seen",
+        "description": "Record that the current user has viewed the specified moment.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The ID of the moment seen"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Moment marked as seen"
+          }
+        }
+      }
+    },
+    "/api/moments/all": {
+      "get": {
+        "tags": [
+          "Moments"
+        ],
+        "summary": "Get Companion Moments",
+        "description": "Allows a companion to see all of their own posted moments with likes, diamonds, etc.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Moments fetched successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "mediaUrl": {
+                            "type": "string"
+                          },
+                          "caption": {
+                            "type": "string"
+                          },
+                          "likes": {
+                            "type": "integer"
+                          },
+                          "diamonds": {
+                            "type": "integer"
+                          },
+                          "rings": {
+                            "type": "integer"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "expiresAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "viewCount": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "page": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "totalPages": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "description": "Page number for pagination"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 10
+            },
+            "description": "Number of items per page"
+          }
+        ]
       }
     }
   }

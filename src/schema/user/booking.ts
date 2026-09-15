@@ -4,6 +4,9 @@ export const createBooking = Joi.object({
   date: Joi.date().iso().required(),
   startTime: Joi.date().iso().required(),
   endTime: Joi.date().iso().required(),
+  latitude: Joi.number().optional(),
+  longitude: Joi.number().optional(),
+  address: Joi.string().optional(),
 });
 
 export const acceptBooking = Joi.object({
