@@ -2119,6 +2119,24 @@
             "schema": {
               "type": "number"
             }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
           }
         ],
         "responses": {
@@ -2132,13 +2150,39 @@
                     "status": {
                       "type": "boolean"
                     },
-                    "msg": {
-                      "type": "string"
-                    },
                     "data": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/MomentDto"
+                        "type": "object",
+                        "properties": {
+                          "companionId": { "type": "integer" },
+                          "username": { "type": "string" },
+                          "profileImage": { "type": "string" },
+                          "allSeen": { "type": "boolean" },
+                          "moments": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "momentId": { "type": "integer" },
+                                "mediaUrl": { "type": "string" },
+                                "caption": { "type": "string", "nullable": true },
+                                "createdAt": { "type": "string", "format": "date-time" },
+                                "expiresAt": { "type": "string", "format": "date-time" },
+                                "isSeen": { "type": "boolean" }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "total": { "type": "integer" },
+                        "page": { "type": "integer" },
+                        "limit": { "type": "integer" },
+                        "totalPages": { "type": "integer" }
                       }
                     }
                   }
@@ -2159,6 +2203,7 @@
         }
       }
     },
+
     "/moments/{id}": {
       "delete": {
         "tags": [
