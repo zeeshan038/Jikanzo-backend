@@ -145,6 +145,9 @@ export const getFeedMoments = async (req: Request, res: Response): Promise<any> 
                 momentId: m.id,
                 mediaUrl: m.mediaUrl,
                 caption: m.caption,
+                likes: m.likes,
+                diamonds: m.diamonds,
+                rings: m.rings,
                 createdAt: m.createdAt,
                 expiresAt: m.expiresAt,
                 isSeen

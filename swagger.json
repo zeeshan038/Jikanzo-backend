@@ -2155,21 +2155,53 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "companionId": { "type": "integer" },
-                          "username": { "type": "string" },
-                          "profileImage": { "type": "string" },
-                          "allSeen": { "type": "boolean" },
+                          "companionId": {
+                            "type": "integer"
+                          },
+                          "username": {
+                            "type": "string"
+                          },
+                          "profileImage": {
+                            "type": "string"
+                          },
+                          "allSeen": {
+                            "type": "boolean"
+                          },
                           "moments": {
                             "type": "array",
                             "items": {
                               "type": "object",
                               "properties": {
-                                "momentId": { "type": "integer" },
-                                "mediaUrl": { "type": "string" },
-                                "caption": { "type": "string", "nullable": true },
-                                "createdAt": { "type": "string", "format": "date-time" },
-                                "expiresAt": { "type": "string", "format": "date-time" },
-                                "isSeen": { "type": "boolean" }
+                                "momentId": {
+                                  "type": "integer"
+                                },
+                                "mediaUrl": {
+                                  "type": "string"
+                                },
+                                "caption": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "createdAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "expiresAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "isSeen": {
+                                  "type": "boolean"
+                                },
+                                "likes": {
+                                  "type": "integer"
+                                },
+                                "diamonds": {
+                                  "type": "integer"
+                                },
+                                "rings": {
+                                  "type": "integer"
+                                }
                               }
                             }
                           }
@@ -2179,10 +2211,18 @@
                     "pagination": {
                       "type": "object",
                       "properties": {
-                        "total": { "type": "integer" },
-                        "page": { "type": "integer" },
-                        "limit": { "type": "integer" },
-                        "totalPages": { "type": "integer" }
+                        "total": {
+                          "type": "integer"
+                        },
+                        "page": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "totalPages": {
+                          "type": "integer"
+                        }
                       }
                     }
                   }
@@ -2203,7 +2243,6 @@
         }
       }
     },
-
     "/moments/{id}": {
       "delete": {
         "tags": [
@@ -3169,6 +3208,15 @@
                                 },
                                 "isSeen": {
                                   "type": "boolean"
+                                },
+                                "likes": {
+                                  "type": "integer"
+                                },
+                                "diamonds": {
+                                  "type": "integer"
+                                },
+                                "rings": {
+                                  "type": "integer"
                                 }
                               }
                             }
