@@ -17,8 +17,7 @@ import {
 import { genrateToken } from '../../utils/methods';
 import {
     generateUniqueCloudflareId,
-    ensureR2UserFolders,
-    uploadToCloudflare
+    ensureR2UserFolders
 } from '../../utils/cloudflare';
 
 
@@ -636,7 +635,6 @@ export const uploadGallery = async (req: Request, res: Response): Promise<any> =
             });
         }
 
-        // Append the array of uploaded URLs to the user's gallery field
         await prisma.user.update({
             where: { id: userId },
             data: {
