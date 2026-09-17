@@ -383,6 +383,19 @@
           "endTime": {
             "type": "string",
             "format": "date-time"
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          },
+          "address": {
+            "type": "string"
+          },
+          "activity": {
+            "type": "string",
+            "example": "Coffee/Beverage > Coffee/Cafe"
           }
         }
       },
@@ -1752,12 +1765,22 @@
                   "msg": "Booking request created successfully",
                   "data": {
                     "id": 1,
-                    "clientId": 12,
-                    "companionId": 5,
-                    "date": "2024-11-20T00:00:00.000Z",
-                    "startTime": "2024-11-20T18:00:00.000Z",
-                    "endTime": "2024-11-20T22:00:00.000Z",
-                    "status": "PENDING"
+                    "clientId": 5,
+                    "companionId": 10,
+                    "date": "2023-12-01T00:00:00.000Z",
+                    "startTime": "2023-12-01T10:00:00.000Z",
+                    "endTime": "2023-12-01T12:00:00.000Z",
+                    "latitude": 35.6895,
+                    "longitude": 139.6917,
+                    "address": "Tokyo Station",
+                    "activity": "Coffee/Beverage > Coffee/Cafe",
+                    "status": "PENDING",
+                    "totalAmount": 80,
+                    "otp": "4829",
+                    "paymentStatus": "PENDING",
+                    "extensionStatus": "NONE",
+                    "createdAt": "2023-10-15T08:30:00.000Z",
+                    "updatedAt": "2023-10-15T08:30:00.000Z"
                   }
                 }
               }
@@ -3595,7 +3618,7 @@
         ]
       }
     },
-    "/user/companion/dashboard": {
+    "/companion/dashboard": {
       "get": {
         "tags": [
           "Companion"
@@ -3844,7 +3867,7 @@
         }
       }
     },
-    "/user/companion/become-companion": {
+    "/companion/become-companion": {
       "post": {
         "tags": [
           "Companion"
@@ -3872,8 +3895,110 @@
                       "example": "Successfully became a companion"
                     },
                     "data": {
-                      "$ref": "#/components/schemas/UserDto"
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "cloudflareId": {
+                          "type": "string"
+                        },
+                        "username": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "type": "string"
+                        },
+                        "profileImage": {
+                          "type": "string"
+                        },
+                        "role": {
+                          "type": "string"
+                        },
+                        "walletBalance": {
+                          "type": "number"
+                        },
+                        "about": {
+                          "type": "string"
+                        },
+                        "languages": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityType": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "savedLocations": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        },
+                        "gender": {
+                          "type": "string"
+                        },
+                        "age": {
+                          "type": "integer"
+                        },
+                        "gallery": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "intros": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "currentToken": {
+                          "type": "string"
+                        },
+                        "fcmToken": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      }
                     }
+                  }
+                },
+                "example": {
+                  "status": true,
+                  "msg": "Successfully became a companion",
+                  "data": {
+                    "id": 232,
+                    "cloudflareId": "0ca3ebff7378",
+                    "username": "Muhammnad Zeeshan 1",
+                    "phone": "+919902693",
+                    "profileImage": "",
+                    "role": "BOTH",
+                    "walletBalance": 0,
+                    "about": "",
+                    "languages": [],
+                    "activityType": [],
+                    "savedLocations": [],
+                    "gender": "",
+                    "age": 0,
+                    "gallery": [],
+                    "intros": [],
+                    "createdAt": "2026-09-17T18:44:20.735Z",
+                    "updatedAt": "2026-09-17T18:49:22.697Z",
+                    "currentToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiIyMzIiLCJpYXQiOjE3ODk2NzA2NjAsImV4cCI6MTc5MDI3NTQ2MH0.Z_Pv67P0POUsnQuhNz4SzBggMKQnRNF9p1Wy-OFC1tM",
+                    "fcmToken": null
                   }
                 }
               }
@@ -3912,7 +4037,7 @@
         }
       }
     },
-    "/user/companion/become-client": {
+    "/companion/become-client": {
       "post": {
         "tags": [
           "Companion"
@@ -3980,7 +4105,7 @@
         }
       }
     },
-    "/user/companion/toggle-online-status": {
+    "/companion/toggle-online-status": {
       "post": {
         "tags": [
           "Companion"

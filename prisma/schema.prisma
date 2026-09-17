@@ -91,6 +91,7 @@ model Booking {
   latitude     Float?
   longitude    Float?
   address      String?
+  activity     String?
   status       String   @default("PENDING") // PENDING, ACTIVE, COMPLETED, CANCELLED
   totalAmount  Float?
   otp          String?

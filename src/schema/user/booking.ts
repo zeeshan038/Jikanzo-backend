@@ -7,6 +7,7 @@ export const createBooking = Joi.object({
   latitude: Joi.number().optional(),
   longitude: Joi.number().optional(),
   address: Joi.string().optional(),
+  activity: Joi.string().optional(),
 });
 
 export const acceptBooking = Joi.object({

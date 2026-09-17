@@ -39,16 +39,27 @@ export const bookCompanion = async (req: Request, res: Response) => {
     // Generate a 4-digit OTP
     const otp = Math.floor(1000 + Math.random() * 9000).toString();
 
+    const startDate = new Date(payload.startTime);
+    const endDate = new Date(payload.endTime);
+    // Calculate duration in hours
+    const durationMs = endDate.getTime() - startDate.getTime();
+    const durationHours = durationMs > 0 ? durationMs / (1000 * 60 * 60) : 0;
+    
+    const hourlyRate = companion.hourlyRate || 0;
+    const totalAmount = durationHours * hourlyRate;
+
     const booking = await prisma.booking.create({
       data: {
         clientId,
         companionId: Number(companionId),
         date: new Date(payload.date),
-        startTime: new Date(payload.startTime),
-        endTime: new Date(payload.endTime),
+        startTime: startDate,
+        endTime: endDate,
         latitude: payload.latitude,
         longitude: payload.longitude,
         address: payload.address,
+        activity: payload.activity,
+        totalAmount: totalAmount > 0 ? totalAmount : 0,
         status: "PENDING",
         otp // Save OTP in DB
       }
