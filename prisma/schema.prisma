@@ -98,6 +98,9 @@ model Booking {
   stripePaymentIntentId String?
   cancelledById Int?
   cancellationReason String?
+  extensionStatus String   @default("NONE") // NONE, PENDING, ACCEPTED, DENIED
+  extensionHours Int?
+  extensionAmount Float?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -111,6 +114,7 @@ model Review {
   companionId  Int
   rating       Int
   comment      String?
+  tags         String[] @default([])
   createdAt    DateTime @default(now())
 
   client       User             @relation("ClientReviews", fields: [clientId], references: [id])
