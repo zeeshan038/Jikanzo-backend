@@ -103,7 +103,34 @@ export const getDashboardData = async (req: Request, res: Response): Promise<voi
       }
     });
 
-    // 5. Calculate repeat rate
+    // 5. Fetch Profile Views Analytics
+    const todayViews = await prisma.profileView.count({
+      where: {
+        companionId: profile.id,
+        createdAt: {
+          gte: today,
+          lt: tomorrow
+        }
+      }
+    });
+
+    const recentViewersRecords = await prisma.profileView.findMany({
+      where: { companionId: profile.id },
+      orderBy: { createdAt: 'desc' },
+      distinct: ['viewerId'],
+      take: 3,
+      include: {
+        viewer: {
+          select: { profileImage: true }
+        }
+      }
+    });
+    
+    const recentViewers = recentViewersRecords.map(record => ({
+      profileImage: record.viewer.profileImage
+    }));
+
+    // 6. Calculate repeat rate
     let repeatRate = 0;
     if (profile.totalSessions > 0) {
       repeatRate = Math.round((profile.repeatClients / profile.totalSessions) * 100);
@@ -119,7 +146,11 @@ export const getDashboardData = async (req: Request, res: Response): Promise<voi
         },
         todayBookings: todayBookings,
         activeBookings: activeBookingsCount,
-        profileViews: profile.profileViews,
+        profileViews: {
+          total: profile.profileViews,
+          today: todayViews,
+          recentViewers: recentViewers
+        },
         rating: profile.rating,
         trustRank: profile.trustRank,
         performances: {

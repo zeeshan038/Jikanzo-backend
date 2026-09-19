@@ -237,6 +237,23 @@ export const specificCompanion = async (req: Request, res: Response): Promise<an
             return res.status(404).json({ status: false, msg: "Companion not found" });
         }
 
+        // Log Profile View if the viewer is not the companion themselves
+        if (currentUserId !== companion.userId) {
+            // Run asynchronously so we don't block the response
+            Promise.all([
+                prisma.profileView.create({
+                    data: {
+                        viewerId: currentUserId,
+                        companionId: companion.id
+                    }
+                }),
+                prisma.companionProfile.update({
+                    where: { id: companion.id },
+                    data: { profileViews: { increment: 1 } }
+                })
+            ]).catch(err => console.error("Error logging profile view:", err));
+        }
+
         // Calculate Moments Analytics
         let totalLikes = 0;
         let totalRings = 0;

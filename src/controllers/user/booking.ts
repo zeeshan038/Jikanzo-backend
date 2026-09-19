@@ -24,9 +24,6 @@ export const bookCompanion = async (req: Request, res: Response) => {
   }
 
   try {
-
-
-
     const companion = await prisma.companionProfile.findUnique({
       where: { id: Number(companionId) },
       include: { user: true } // Include user to get the companion's user details for notification
@@ -44,7 +41,7 @@ export const bookCompanion = async (req: Request, res: Response) => {
     // Calculate duration in hours
     const durationMs = endDate.getTime() - startDate.getTime();
     const durationHours = durationMs > 0 ? durationMs / (1000 * 60 * 60) : 0;
-    
+
     const hourlyRate = companion.hourlyRate || 0;
     const totalAmount = durationHours * hourlyRate;
 
@@ -559,6 +556,57 @@ export const respondToExtension = async (req: Request, res: Response) => {
     return res.status(200).json({
       status: true,
       msg: `Extension request ${action.toLowerCase()}ed`,
+      data: updatedBooking
+    });
+  } catch (error: any) {
+    res.status(500).json({ status: false, msg: error.message });
+  }
+};
+
+/**
+ * @Description Start a booking
+ * @Route POST /api/booking/:id/start
+ * @Access Private
+ */
+export const startBookingController = async (req: Request, res: Response) => {
+  const { id: userId } = (req as any).user;
+  const bookingId = parseInt(req.params.id);
+
+  try {
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { companion: true }
+    });
+
+    if (!booking) {
+      return res.status(404).json({ status: false, msg: "Booking not found" });
+    }
+
+    const companionProfile = await prisma.companionProfile.findFirst({ where: { userId } });
+    const isClient = booking.clientId === userId;
+    const isCompanion = companionProfile && booking.companionId === companionProfile.id;
+
+    if (!isClient && !isCompanion) {
+      return res.status(403).json({
+        status: false,
+        msg: "Unauthorized to start this booking."
+      });
+    }
+
+    if (booking.status !== 'ACCEPTED') {
+      return res.status(400).json({ 
+        status: false,
+         msg: "Only accepted bookings can be started." });
+    }
+
+    const updatedBooking = await prisma.booking.update({
+      where: { id: bookingId },
+      data: { status: 'ACTIVE' }
+    });
+
+    return res.status(200).json({
+      status: true,
+      msg: "Booking started successfully",
       data: updatedBooking
     });
   } catch (error: any) {

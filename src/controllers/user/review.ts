@@ -15,7 +15,6 @@ export const addReview = async (req: Request, res: Response) => {
   }
 
   try {
-    // Optional: check if the client actually had a completed booking with this companion
     const hasCompletedBooking = await prisma.booking.findFirst({
       where: {
         clientId,
@@ -28,7 +27,7 @@ export const addReview = async (req: Request, res: Response) => {
       return res.status(403).json({ status: false, msg: "You can only review companions you have had completed bookings with." });
     }
 
-    // Check if review already exists
+    //Existing Review 
     const existingReview = await prisma.review.findFirst({
       where: {
         clientId,

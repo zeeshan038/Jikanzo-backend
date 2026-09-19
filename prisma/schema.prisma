@@ -42,6 +42,8 @@ model User {
   currentToken     String?
   fcmToken         String?
   feedStats        FeedStat[]        @relation("UserFeedStats")
+  notifications    Notification[]
+  profileViews     ProfileView[]     @relation("UserViewedProfiles")
 }
 
 model CompanionProfile {
@@ -79,6 +81,7 @@ model CompanionProfile {
   schedules           WeeklySchedule[]
   oneTimeAvailabilities OneTimeAvailability[]
   blockedDates        BlockedDate[]
+  recentViews         ProfileView[] @relation("CompanionProfileViews")
 }
 
 model Booking {
@@ -133,9 +136,27 @@ model Otp {
 }
 
 
-// model Notification {
-//   id Int @id @default(autoincrement())
-// }
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  title     String
+  body      String
+  data      Json?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model ProfileView {
+  id          Int      @id @default(autoincrement())
+  viewerId    Int
+  companionId Int
+  createdAt   DateTime @default(now())
+
+  viewer      User             @relation("UserViewedProfiles", fields: [viewerId], references: [id])
+  companion   CompanionProfile @relation("CompanionProfileViews", fields: [companionId], references: [id])
+}
 
 model WalletTransaction {
   id          Int      @id @default(autoincrement())

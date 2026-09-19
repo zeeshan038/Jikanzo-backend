@@ -12,6 +12,7 @@ import momentsRouter from './moments';
 import availabilityRouter from './availability';
 import companionRouter from './companion';
 import reviewRouter from './review';
+import notificationRouter from './notification';
 
 router.use('/user', userRouter);
 router.use('/feed', feedRouter);
@@ -22,5 +23,6 @@ router.use('/moments', momentsRouter);
 router.use('/availability', availabilityRouter);
 router.use('/companion', companionRouter);
 router.use('/review', reviewRouter);
+router.use('/notification', notificationRouter);
 
 export default router;

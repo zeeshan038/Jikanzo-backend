@@ -7,7 +7,8 @@ import {
   getClientBookings, 
   getCompanionBookings,
   requestExtension,
-  respondToExtension
+  respondToExtension,
+  startBookingController
 } from '../../controllers/user/booking';
 import { verifyUser } from '../../middlewares/verifyUser';
 
@@ -22,5 +23,6 @@ router.post('/complete', completeBookingController);
 router.post('/pay-with-wallet', payWithWallet);
 router.post('/:id/request-extension', requestExtension);
 router.post('/:id/respond-extension', respondToExtension);
+router.post('/:id/start', startBookingController);
 
 export default router;
