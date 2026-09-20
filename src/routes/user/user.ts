@@ -8,7 +8,8 @@ import {
     updateProfile,
     whoami,
     checkProfileProgress,
-    uploadGallery
+    uploadGallery,
+    UpdateFcm
 } from '../../controllers/user/user';
 
 import { uploadImage, uploadVideo } from '../../controllers/user/upload';
@@ -27,6 +28,7 @@ router.post('/login', loginUser);
 router.use(verifyUser)
 router.put('/update-profile', updateProfile);
 router.get('/whoami', whoami);
+router.post('/update-fcm', UpdateFcm);
 
 router.post('/upload-image', upload.single('image'), uploadImage);
 router.post('/upload-video', upload.single('video'), uploadVideo);

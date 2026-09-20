@@ -1739,6 +1739,9 @@
                                     },
                                     "address": {
                                         "type": "string"
+                                    },
+                                    "activity": {
+                                        "type": "string"
                                     }
                                 },
                                 "required": [
@@ -4343,6 +4346,70 @@
                 ]
             }
         },
+        "/companion/update-fcm": {
+            "post": {
+                "tags": [
+                    "Companion"
+                ],
+                "summary": "Update FCM Token",
+                "description": "Update the Firebase Cloud Messaging token for the authenticated companion for push notifications.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "fcm"
+                                ],
+                                "properties": {
+                                    "fcm": {
+                                        "type": "string",
+                                        "description": "The FCM token"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "FCM token updated successfully",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "status": {
+                                    "type": "boolean"
+                                },
+                                "msg": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request (e.g., fcm is required)",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "status": {
+                                    "type": "boolean"
+                                },
+                                "msg": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+
         "/api/user/update-fcm": {
             "post": {
                 "tags": [
@@ -4350,6 +4417,11 @@
                 ],
                 "summary": "Update FCM Token",
                 "description": "Update the Firebase Cloud Messaging token for the authenticated user for push notifications.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
                 "requestBody": {
                     "required": true,
                     "content": {
