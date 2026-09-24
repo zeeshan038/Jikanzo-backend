@@ -11,7 +11,7 @@ const JSS_CONFIG = {
     RELIABILITY: 0.10,
   },
   THRESHOLDS: {
-    REPEAT_CLIENT_TARGET_RATE: 0.30, // 30% repeat rate gets full 100 points
+    REPEAT_CLIENT_TARGET_RATE: 0.30, 
   },
 };
 

@@ -72,7 +72,6 @@ export const sendOtp = async (req: Request, res: Response): Promise<any> => {
     }
 };
 
-
 /**
  * @Description Verify OTP
  * @Method POST api/user/verify-otp
@@ -618,7 +617,7 @@ export const UpdateFcm = async (req: Request, res: Response): Promise<any> =>{
 
 
 /**
- * @Description Upload Galery
+ * @Description Upload Galery Images
  * @Method POST api/user/upload-gallery
  * @Access Private
  */
