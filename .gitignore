@@ -71,6 +71,10 @@ web_modules/
 # Yarn Integrity file
 .yarn-integrity
 
+# Firebase / GCP service account keys (use FIREBASE_ADMIN_SDK_JSON in .env)
+*firebase*adminsdk*.json
+*-firebase-adminsdk-*.json
+
 # dotenv environment variables file
 .env
 .env.test

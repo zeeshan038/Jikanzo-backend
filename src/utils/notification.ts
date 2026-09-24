@@ -1,7 +1,13 @@
 import prisma from "../config/db";
-import admin from "../config/firebase";
+import { getMessaging } from "firebase-admin/messaging";
 
-export const sendPushNotification = async (userId: number, title: string, body: string, data: any = {}, type?: string) => {
+export const sendPushNotification = async (
+  userId: number,
+  title: string,
+  body: string,
+  data: any = {},
+  type?: string
+): Promise<void> => {
   try {
     // 1. Create the notification in the database
     await prisma.notification.create({
@@ -39,7 +45,7 @@ export const sendPushNotification = async (userId: number, title: string, body: 
         token: user.fcmToken
       };
 
-      const response = await admin.messaging().send(message);
+      const response = await getMessaging().send(message);
       console.log(`[Push Notification Sent] -> User ID: ${userId}, Message ID: ${response}`);
     } else {
       console.log(`[Push Notification Skipped] -> User ID: ${userId} (No FCM Token found)`);

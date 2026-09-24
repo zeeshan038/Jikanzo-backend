@@ -1,8 +1,26 @@
 import { Request, Response } from "express";
 import prisma from "../../config/db";
-import { createBooking, acceptBooking } from "../../schema/user/booking";
+import {
+  createBooking,
+  acceptBooking,
+  cancelBookingSchema,
+  rescheduleBookingSchema,
+  verifyBookingOtpSchema,
+} from "../../schema/user/booking";
 import { payWithWalletSchema } from '../../schema/user/wallet';
 import { calculateJSS } from "../../utils/jssCalculator";
+import { BOOKING_CANCEL_REASONS, isValidCancelReasonCode } from "../../constants/bookingCancelReasons";
+import { chargeBookingFromWallet } from "../../utils/bookingWallet";
+import {
+  bookingDetailInclude,
+  buildClientSummary,
+  buildCompanionPublicProfile,
+  buildPaymentSummary,
+  listBookingSelect,
+  normalizeBookingListType,
+  recalculateBookingAmount,
+} from "../../utils/bookingHelpers";
+import { getStoredOrComputedBreakdown } from "../../utils/bookingFinance";
 
 /**
  * @Description Book a companion
@@ -43,7 +61,7 @@ export const bookCompanion = async (req: Request, res: Response) => {
     const durationHours = durationMs > 0 ? durationMs / (1000 * 60 * 60) : 0;
 
     const hourlyRate = companion.hourlyRate || 0;
-    const totalAmount = durationHours * hourlyRate;
+    const amounts = recalculateBookingAmount(hourlyRate, startDate, endDate);
 
     const booking = await prisma.booking.create({
       data: {
@@ -56,8 +74,12 @@ export const bookCompanion = async (req: Request, res: Response) => {
         longitude: payload.longitude,
         address: payload.address,
         activity: payload.activity,
-        totalAmount: totalAmount > 0 ? totalAmount : 0,
+        totalAmount: amounts.totalAmount,
+        grossAmount: amounts.grossAmount,
+        platformFee: amounts.platformFee,
+        companionNetAmount: amounts.companionNetAmount,
         status: "PENDING",
+        otpVerified: false,
         otp // Save OTP in DB
       }
     });
@@ -120,6 +142,20 @@ export const acceptBookingController = async (req: Request, res: Response) => {
       return res.status(404).json({
         status: false,
         msg: "Booking not found"
+      });
+    }
+
+    if (booking.companion.userId !== (req as any).user?.id) {
+      return res.status(403).json({
+        status: false,
+        msg: "Only the assigned companion can accept or decline this booking",
+      });
+    }
+
+    if (booking.status !== 'PENDING') {
+      return res.status(400).json({
+        status: false,
+        msg: "Only pending booking requests can be accepted or declined",
       });
     }
 
@@ -240,71 +276,60 @@ export const payWithWallet = async (req: Request, res: Response) => {
       return res.status(400).json({ status: false, msg: "Booking is already paid" });
     }
 
-    const totalAmount = booking.totalAmount || 0;
-    if (totalAmount <= 0) {
+    const grossAmount = booking.totalAmount || 0;
+    if (grossAmount <= 0) {
       return res.status(400).json({ status: false, msg: "Invalid booking amount" });
     }
 
-    // Check user's wallet balance
-    const user = await prisma.user.findUnique({
-      where: { id: userId }
-    });
-
-    if (!user || user.walletBalance < totalAmount) {
-      return res.status(400).json({ status: false, msg: "Insufficient wallet balance" });
+    if (booking.clientId !== userId) {
+      return res.status(403).json({ status: false, msg: "Only the client can pay for this booking" });
     }
 
-    // Process transaction securely
-    await prisma.$transaction(async (tx) => {
-      // 1. Deduct from client
-      await tx.user.update({
-        where: { id: userId },
-        data: { walletBalance: { decrement: totalAmount } }
-      });
-
-      // 2. Add to companion
-      const companion = await tx.companionProfile.findUnique({
-        where: { id: booking.companionId }
-      });
-
-      if (companion) {
-        await tx.user.update({
-          where: { id: companion.userId },
-          data: { walletBalance: { increment: totalAmount } }
-        });
-
-        // 3. Create client ledger entry
-        await tx.walletTransaction.create({
-          data: {
-            userId: userId,
-            amount: totalAmount,
-            type: 'DEBIT',
-            description: `Paid for booking #${booking.id}`
-          }
-        });
-
-        // 4. Create companion ledger entry
-        await tx.walletTransaction.create({
-          data: {
-            userId: companion.userId,
-            amount: totalAmount,
-            type: 'CREDIT',
-            description: `Received payment for booking #${booking.id}`
-          }
-        });
-      }
-
-      // 5. Update booking status
-      await tx.booking.update({
-        where: { id: booking.id },
-        data: { paymentStatus: 'PAID' }
-      });
+    const companion = await prisma.companionProfile.findUnique({
+      where: { id: booking.companionId },
     });
+
+    if (!companion) {
+      return res.status(404).json({ status: false, msg: "Companion not found" });
+    }
+
+    let paymentBreakdown;
+    try {
+      const { breakdown } = await chargeBookingFromWallet({
+        clientUserId: userId,
+        companionUserId: companion.userId,
+        bookingId: booking.id,
+        grossAmount,
+        clientDescription: `Paid for booking #${booking.id}`,
+        companionDescription: `Received payment for booking #${booking.id}`,
+      });
+      paymentBreakdown = breakdown;
+
+      await prisma.booking.update({
+        where: { id: booking.id },
+        data: {
+          paymentStatus: 'PAID',
+          grossAmount: breakdown.grossAmount,
+          platformFee: breakdown.platformFee,
+          companionNetAmount: breakdown.companionNetAmount,
+        },
+      });
+    } catch (err: any) {
+      if (err.message === 'INSUFFICIENT_BALANCE') {
+        return res.status(400).json({ status: false, msg: "Insufficient wallet balance" });
+      }
+      throw err;
+    }
 
     res.status(200).json({
       status: true,
       msg: "Payment successful",
-      data: { bookingId, paymentStatus: 'PAID', amountDeducted: totalAmount }
+      data: {
+        bookingId,
+        paymentStatus: 'PAID',
+        amountDeducted: grossAmount,
+        paymentSummary: paymentBreakdown,
+      },
     });
 
   } catch (error: any) {
@@ -312,6 +337,22 @@ export const payWithWallet = async (req: Request, res: Response) => {
   }
 };
 
+async function resolveBookingParticipant(bookingId: number, userId: number) {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: bookingDetailInclude,
+  });
+  if (!booking) {
+    return { error: { status: 404, msg: "Booking not found" } as const };
+  }
+  const companionProfile = await prisma.companionProfile.findFirst({ where: { userId } });
+  const isClient = booking.clientId === userId;
+  const isCompanion = companionProfile?.id === booking.companionId;
+  if (!isClient && !isCompanion) {
+    return { error: { status: 403, msg: "Unauthorized to access this booking" } as const };
+  }
+  return { booking, isClient, isCompanion };
+}
 
 /**
  * @Description Get client bookings (history, upcoming, requests)
@@ -320,40 +361,22 @@ export const payWithWallet = async (req: Request, res: Response) => {
  */
 export const getClientBookings = async (req: Request, res: Response) => {
   const userId = req.user.id;
-  const { type } = req.query;
+  const listType = normalizeBookingListType(req.query.type);
 
   try {
     const whereClause: any = { clientId: userId };
 
-    if (type === 'requests') {
+    if (listType === 'requests') {
       whereClause.status = 'PENDING';
-    } else if (type === 'upcoming') {
+    } else if (listType === 'upcoming') {
       whereClause.status = { in: ['ACCEPTED', 'ACTIVE'] };
-    } else if (type === 'history') {
+    } else if (listType === 'history') {
       whereClause.status = { in: ['COMPLETED', 'CANCELLED'] };
     }
 
     const bookings = await prisma.booking.findMany({
       where: whereClause,
-      select: {
-        id: true,
-        status: true,
-        date: true,
-        startTime: true,
-        endTime: true,
-        address: true,
-        totalAmount: true,
-        otp: true,
-        cancellationReason: true,
-        companion: {
-          select: {
-            id: true,
-            user: {
-              select: { username: true, profileImage: true }
-            }
-          }
-        }
-      },
+      select: listBookingSelect,
       orderBy: { date: 'desc' }
     });
 
@@ -378,7 +401,7 @@ export const getClientBookings = async (req: Request, res: Response) => {
  */
 export const getCompanionBookings = async (req: Request, res: Response) => {
   const userId = req.user.id;
-  const { type } = req.query;
+  const listType = normalizeBookingListType(req.query.type);
 
   try {
     const companionProfile = await prisma.companionProfile.findFirst({
@@ -391,30 +414,17 @@ export const getCompanionBookings = async (req: Request, res: Response) => {
 
     const whereClause: any = { companionId: companionProfile.id };
 
-    if (type === 'requests') {
+    if (listType === 'requests') {
       whereClause.status = 'PENDING';
-    } else if (type === 'upcoming') {
+    } else if (listType === 'upcoming') {
       whereClause.status = { in: ['ACCEPTED', 'ACTIVE'] };
-    } else if (type === 'history') {
+    } else if (listType === 'history') {
       whereClause.status = { in: ['COMPLETED', 'CANCELLED'] };
     }
 
     const bookings = await prisma.booking.findMany({
       where: whereClause,
-      select: {
-        id: true,
-        status: true,
-        date: true,
-        startTime: true,
-        endTime: true,
-        address: true,
-        totalAmount: true,
-        otp: true,
-        cancellationReason: true,
-        client: {
-          select: { id: true, username: true, profileImage: true }
-        }
-      },
+      select: listBookingSelect,
       orderBy: { date: 'desc' }
     });
 
@@ -433,7 +443,7 @@ export const getCompanionBookings = async (req: Request, res: Response) => {
 
 /**
  * @Description Request to extend an active booking
- * @Route POST /api/booking/:id/request-extension
+ * @Route POST /api/booking/request-extension/:id
  * @Access Private
  */
 export const requestExtension = async (req: Request, res: Response) => {
@@ -492,7 +502,7 @@ export const requestExtension = async (req: Request, res: Response) => {
 
 /**
  * @Description Companion responds to an extension request
- * @Route POST /api/booking/:id/respond-extension
+ * @Route POST /api/booking/respond-extension/:id
  * @Access Private
  */
 export const respondToExtension = async (req: Request, res: Response) => {
@@ -511,7 +521,8 @@ export const respondToExtension = async (req: Request, res: Response) => {
     }
 
     const booking = await prisma.booking.findUnique({
-      where: { id: bookingId }
+      where: { id: bookingId },
+      include: { companion: true },
     });
 
     if (!booking) {
@@ -529,17 +540,42 @@ export const respondToExtension = async (req: Request, res: Response) => {
     let updateData: any = {};
 
     if (action === 'ACCEPT') {
-      // Calculate new end time
+      const extensionGross = booking.extensionAmount || 0;
+      if (extensionGross > 0) {
+        try {
+          await chargeBookingFromWallet({
+            clientUserId: booking.clientId,
+            companionUserId: booking.companion.userId,
+            bookingId: booking.id,
+            grossAmount: extensionGross,
+            clientDescription: `Extension payment for booking #${booking.id}`,
+            companionDescription: `Extension earnings for booking #${booking.id}`,
+          });
+        } catch (err: any) {
+          if (err.message === 'INSUFFICIENT_BALANCE') {
+            return res.status(400).json({
+              status: false,
+              msg: "Client has insufficient wallet balance for the extension",
+            });
+          }
+          throw err;
+        }
+      }
+
       const currentEndTime = new Date(booking.endTime);
       currentEndTime.setHours(currentEndTime.getHours() + (booking.extensionHours || 0));
 
-      // Calculate new total amount
-      const newTotalAmount = (booking.totalAmount || 0) + (booking.extensionAmount || 0);
+      const hourlyRate = booking.companion.hourlyRate || 0;
+      const amounts = recalculateBookingAmount(hourlyRate, booking.startTime, currentEndTime);
 
       updateData = {
         extensionStatus: 'ACCEPTED',
+        extensionPaymentStatus: extensionGross > 0 ? 'PAID' : booking.extensionPaymentStatus,
         endTime: currentEndTime,
-        totalAmount: newTotalAmount
+        totalAmount: amounts.totalAmount,
+        grossAmount: amounts.grossAmount,
+        platformFee: amounts.platformFee,
+        companionNetAmount: amounts.companionNetAmount,
       };
     } else {
       updateData = {
@@ -566,7 +602,7 @@ export const respondToExtension = async (req: Request, res: Response) => {
 
 /**
  * @Description Start a booking
- * @Route POST /api/booking/:id/start
+ * @Route POST /api/booking/start/:id
  * @Access Private
  */
 export const startBookingController = async (req: Request, res: Response) => {
@@ -600,6 +636,13 @@ export const startBookingController = async (req: Request, res: Response) => {
          msg: "Only accepted bookings can be started." });
     }
 
+    if (!booking.otpVerified) {
+      return res.status(400).json({
+        status: false,
+        msg: "Booking OTP must be verified before starting the session",
+      });
+    }
+
     const updatedBooking = await prisma.booking.update({
       where: { id: bookingId },
       data: { status: 'ACTIVE' }
@@ -612,5 +655,359 @@ export const startBookingController = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     res.status(500).json({ status: false, msg: error.message });
+  }
+};
+
+/**
+ * @Description List predefined booking cancellation reasons
+ * @Route GET /api/booking/cancel-reasons
+ * @Access Private
+ */
+export const getCancelReasons = async (_req: Request, res: Response) => {
+  return res.status(200).json({
+    status: true,
+    msg: "Cancellation reasons fetched successfully",
+    data: BOOKING_CANCEL_REASONS,
+  });
+};
+
+/**
+ * @Description Get single booking details for detail screens
+ * @Route GET /api/booking/detail/:id
+ * @Access Private
+ */
+export const getBookingById = async (req: Request, res: Response) => {
+  const userId = (req as any).user.id;
+  const bookingId = parseInt(req.params.id, 10);
+
+  if (Number.isNaN(bookingId)) {
+    return res.status(400).json({ status: false, msg: "Invalid booking id" });
+  }
+
+  try {
+    const result = await resolveBookingParticipant(bookingId, userId);
+    if ("error" in result && result.error) {
+      return res.status(result.error.status).json({ status: false, msg: result.error.msg });
+    }
+
+    const { booking, isClient, isCompanion } = result as Exclude<typeof result, { error: unknown }>;
+    const paymentSummary = buildPaymentSummary(booking);
+    const expiresAt = new Date(booking.createdAt.getTime() + 30 * 60 * 1000);
+
+    const payload: Record<string, unknown> = {
+      id: booking.id,
+      status: booking.status,
+      date: booking.date,
+      startTime: booking.startTime,
+      endTime: booking.endTime,
+      latitude: booking.latitude,
+      longitude: booking.longitude,
+      address: booking.address,
+      activity: booking.activity,
+      paymentStatus: booking.paymentStatus,
+      extensionStatus: booking.extensionStatus,
+      extensionHours: booking.extensionHours,
+      extensionAmount: booking.extensionAmount,
+      extensionPaymentStatus: booking.extensionPaymentStatus,
+      cancellationReason: booking.cancellationReason,
+      cancellationReasonCode: booking.cancellationReasonCode,
+      otpVerified: booking.otpVerified,
+      createdAt: booking.createdAt,
+      updatedAt: booking.updatedAt,
+      paymentSummary,
+      requestExpiresAt: booking.status === "PENDING" ? expiresAt : null,
+      client: buildClientSummary(booking),
+      companionProfile: buildCompanionPublicProfile(booking),
+    };
+
+    if (isClient && ["ACCEPTED", "ACTIVE"].includes(booking.status)) {
+      payload.otp = booking.otp;
+    }
+
+    return res.status(200).json({
+      status: true,
+      msg: "Booking fetched successfully",
+      data: {
+        ...payload,
+        viewerRole: isClient ? "CLIENT" : isCompanion ? "COMPANION" : "UNKNOWN",
+      },
+    });
+  } catch (error: any) {
+    return res.status(500).json({ status: false, msg: error.message });
+  }
+};
+
+
+/**
+ * @Description Payment receipt with platform fee breakdown
+ * @Route GET /api/booking/receipt/:id
+ * @Access Private
+ */
+export const getBookingReceipt = async (req: Request, res: Response) => {
+  const userId = (req as any).user.id;
+  const bookingId = parseInt(req.params.id, 10);
+
+  if (Number.isNaN(bookingId)) {
+    return res.status(400).json({ status: false, msg: "Invalid booking id" });
+  }
+
+  try {
+    const result = await resolveBookingParticipant(bookingId, userId);
+    if ("error" in result && result.error) {
+      return res.status(result.error.status).json({ status: false, msg: result.error.msg });
+    }
+
+    const { booking, isClient, isCompanion } = result as Exclude<typeof result, { error: unknown }>;
+
+    if (booking.paymentStatus !== "PAID") {
+      return res.status(400).json({ status: false, msg: "Receipt is available only for paid bookings" });
+    }
+
+    const breakdown = getStoredOrComputedBreakdown(booking);
+    const transactions = await prisma.walletTransaction.findMany({
+      where: { bookingId: booking.id },
+      orderBy: { createdAt: "asc" },
+    });
+
+    return res.status(200).json({
+      status: true,
+      msg: "Booking receipt fetched successfully",
+      data: {
+        bookingId: booking.id,
+        currency: process.env.BOOKING_CURRENCY || "USD",
+        grossBookingPrice: breakdown.grossAmount,
+        platformFee: breakdown.platformFee,
+        platformFeePercent: breakdown.platformFeePercent,
+        totalCreditedAmount: breakdown.companionNetAmount,
+        paymentStatus: booking.paymentStatus,
+        viewerRole: isClient ? "CLIENT" : isCompanion ? "COMPANION" : "UNKNOWN",
+        transactions,
+      },
+    });
+  } catch (error: any) {
+    return res.status(500).json({ status: false, msg: error.message });
+  }
+};
+
+/**
+ * @Description Cancel a booking with a reason code
+ * @Route POST /api/booking/cancel/:id
+ * @Access Private
+ */
+export const cancelBookingController = async (req: Request, res: Response) => {
+  const userId = (req as any).user.id;
+  const bookingId = parseInt(req.params.id, 10);
+  const validation = cancelBookingSchema.validate(req.body);
+
+  if (Number.isNaN(bookingId)) {
+    return res.status(400).json({ status: false, msg: "Invalid booking id" });
+  }
+
+  if (validation.error) {
+    const errors = validation.error.details.map((d: any) => d.message).join(",");
+    return res.status(400).json({ status: false, msg: errors });
+  }
+
+  const { reasonCode, reasonText } = validation.value;
+  if (!isValidCancelReasonCode(reasonCode)) {
+    return res.status(400).json({ status: false, msg: "Invalid cancellation reason code" });
+  }
+  if (reasonCode === "OTHER" && !reasonText?.trim()) {
+    return res.status(400).json({ status: false, msg: "reasonText is required when reasonCode is OTHER" });
+  }
+
+  try {
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { companion: true },
+    });
+
+    if (!booking) {
+      return res.status(404).json({ status: false, msg: "Booking not found" });
+    }
+
+    const companionProfile = await prisma.companionProfile.findFirst({ where: { userId } });
+    const isClient = booking.clientId === userId;
+    const isCompanion = companionProfile?.id === booking.companionId;
+
+    if (!isClient && !isCompanion) {
+      return res.status(403).json({ status: false, msg: "Unauthorized to cancel this booking" });
+    }
+
+    if (!["PENDING", "ACCEPTED", "ACTIVE"].includes(booking.status)) {
+      return res.status(400).json({ status: false, msg: "This booking cannot be cancelled" });
+    }
+
+    const label = BOOKING_CANCEL_REASONS.find((r) => r.code === reasonCode)?.label || reasonCode;
+    const cancellationReason =
+      reasonCode === "OTHER" ? reasonText!.trim() : `${label}${reasonText ? `: ${reasonText}` : ""}`;
+
+    const updateData: any = {
+      status: "CANCELLED",
+      cancelledById: userId,
+      cancellationReasonCode: reasonCode,
+      cancellationReason,
+    };
+
+    if (isCompanion && booking.status !== "PENDING") {
+      await prisma.companionProfile.update({
+        where: { id: booking.companionId },
+        data: { reliabilityScore: { decrement: 10 } },
+      });
+    }
+
+    const updatedBooking = await prisma.booking.update({
+      where: { id: bookingId },
+      data: updateData,
+    });
+
+    if (booking.status !== "PENDING") {
+      calculateJSS(booking.companionId).catch((err) => console.error("JSS Calculation Error:", err));
+    }
+
+    return res.status(200).json({
+      status: true,
+      msg: "Booking cancelled successfully",
+      data: updatedBooking,
+    });
+  } catch (error: any) {
+    return res.status(500).json({ status: false, msg: error.message });
+  }
+};
+
+/**
+ * @Description Reschedule a booking (client only, before session starts)
+ * @Route PATCH /api/booking/reschedule/:id
+ * @Access Private
+ */
+export const rescheduleBookingController = async (req: Request, res: Response) => {
+  const userId = (req as any).user.id;
+  const bookingId = parseInt(req.params.id, 10);
+  const validation = rescheduleBookingSchema.validate(req.body);
+
+  if (Number.isNaN(bookingId)) {
+    return res.status(400).json({ status: false, msg: "Invalid booking id" });
+  }
+
+  if (validation.error) {
+    const errors = validation.error.details.map((d: any) => d.message).join(",");
+    return res.status(400).json({ status: false, msg: errors });
+  }
+
+  const payload = validation.value;
+
+  try {
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { companion: true },
+    });
+
+    if (!booking) {
+      return res.status(404).json({ status: false, msg: "Booking not found" });
+    }
+
+    if (booking.clientId !== userId) {
+      return res.status(403).json({ status: false, msg: "Only the client can reschedule this booking" });
+    }
+
+    if (!["PENDING", "ACCEPTED"].includes(booking.status)) {
+      return res.status(400).json({ status: false, msg: "Only pending or accepted bookings can be rescheduled" });
+    }
+
+    if (booking.paymentStatus === "PAID") {
+      return res.status(400).json({
+        status: false,
+        msg: "Paid bookings cannot be rescheduled. Cancel and create a new booking instead.",
+      });
+    }
+
+    const startDate = new Date(payload.startTime);
+    const endDate = new Date(payload.endTime);
+    const hourlyRate = booking.companion.hourlyRate || 0;
+    const amounts = recalculateBookingAmount(hourlyRate, startDate, endDate);
+
+    const updatedBooking = await prisma.booking.update({
+      where: { id: bookingId },
+      data: {
+        date: new Date(payload.date),
+        startTime: startDate,
+        endTime: endDate,
+        latitude: payload.latitude ?? booking.latitude,
+        longitude: payload.longitude ?? booking.longitude,
+        address: payload.address ?? booking.address,
+        activity: payload.activity ?? booking.activity,
+        totalAmount: amounts.totalAmount,
+        grossAmount: amounts.grossAmount,
+        platformFee: amounts.platformFee,
+        companionNetAmount: amounts.companionNetAmount,
+        status: "PENDING",
+        extensionStatus: "NONE",
+        extensionHours: null,
+        extensionAmount: null,
+        extensionPaymentStatus: "PENDING",
+        otpVerified: false,
+      },
+    });
+
+    return res.status(200).json({
+      status: true,
+      msg: "Booking rescheduled successfully"
+    });
+  } catch (error: any) {
+    return res.status(500).json({ status: false, msg: error.message });
+  }
+};
+
+
+/**
+ * @Description Verify booking OTP before starting the session
+ * @Route POST /api/booking/verify-otp/:id
+ * @Access Private
+ */
+export const verifyBookingOtpController = async (req: Request, res: Response) => {
+  const userId = (req as any).user.id;
+  const bookingId = parseInt(req.params.id, 10);
+  const validation = verifyBookingOtpSchema.validate(req.body);
+
+  if (Number.isNaN(bookingId)) {
+    return res.status(400).json({ status: false, msg: "Invalid booking id" });
+  }
+
+  if (validation.error) {
+    const errors = validation.error.details.map((d: any) => d.message).join(",");
+    return res.status(400).json({ status: false, msg: errors });
+  }
+
+  try {
+    const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
+
+    if (!booking) {
+      return res.status(404).json({ status: false, msg: "Booking not found" });
+    }
+
+    if (booking.clientId !== userId) {
+      return res.status(403).json({ status: false, msg: "Only the client can verify the booking OTP" });
+    }
+
+    if (!["ACCEPTED", "ACTIVE"].includes(booking.status)) {
+      return res.status(400).json({ status: false, msg: "OTP can be verified for accepted or active bookings only" });
+    }
+
+    if (booking.otp !== validation.value.otp) {
+      return res.status(400).json({ status: false, msg: "Invalid OTP provided" });
+    }
+
+    const updatedBooking = await prisma.booking.update({
+      where: { id: bookingId },
+      data: { otpVerified: true },
+    });
+
+    return res.status(200).json({
+      status: true,
+      msg: "Booking OTP verified successfully",
+      data: { id: updatedBooking.id, otpVerified: updatedBooking.otpVerified },
+    });
+  } catch (error: any) {
+    return res.status(500).json({ status: false, msg: error.message });
   }
 };

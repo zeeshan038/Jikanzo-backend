@@ -102,7 +102,13 @@ model Booking {
   stripePaymentIntentId String?
   cancelledById Int?
   cancellationReason String?
+  cancellationReasonCode String?
+  otpVerified    Boolean  @default(false)
+  grossAmount    Float?
+  platformFee    Float?
+  companionNetAmount Float?
   extensionStatus String   @default("NONE") // NONE, PENDING, ACCEPTED, DENIED
+  extensionPaymentStatus String @default("PENDING") // PENDING, PAID, FAILED (extension charge)
   extensionHours Int?
   extensionAmount Float?
   createdAt    DateTime @default(now())
@@ -162,6 +168,7 @@ model ProfileView {
 model WalletTransaction {
   id          Int      @id @default(autoincrement())
   userId      Int
+  bookingId   Int?
   amount      Float
   type        String   // "CREDIT" or "DEBIT"
   description String?

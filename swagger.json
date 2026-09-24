@@ -159,6 +159,75 @@
                     }
                 }
             },
+            "BookingListUserSummary": {
+                "type": "object",
+                "properties": {
+                    "id": { "type": "integer", "example": 5 },
+                    "username": { "type": "string", "example": "Elena R." },
+                    "profileImage": { "type": "string", "example": "https://cdn.jikanzo.com/users/5/avatar.jpg" },
+                    "age": { "type": "integer", "example": 28 }
+                }
+            },
+            "BookingListCompanionSummary": {
+                "type": "object",
+                "properties": {
+                    "username": { "type": "string", "example": "Kenji Sato" },
+                    "profileImage": { "type": "string", "example": "https://cdn.jikanzo.com/users/10/avatar.jpg" },
+                    "age": { "type": "integer", "example": 32 }
+                }
+            },
+            "BookingListItem": {
+                "type": "object",
+                "properties": {
+                    "id": { "type": "integer", "example": 1 },
+                    "status": {
+                        "type": "string",
+                        "example": "PENDING",
+                        "enum": ["PENDING", "ACCEPTED", "ACTIVE", "COMPLETED", "CANCELLED"]
+                    },
+                    "date": { "type": "string", "format": "date-time", "example": "2026-07-23T00:00:00.000Z" },
+                    "startTime": { "type": "string", "format": "date-time", "example": "2026-07-23T00:00:00.000Z" },
+                    "endTime": { "type": "string", "format": "date-time", "example": "2026-07-23T02:00:00.000Z" },
+                    "address": { "type": "string", "example": "Nwab Restaurant" },
+                    "activity": { "type": "string", "example": "Fine Dining" },
+                    "totalAmount": { "type": "number", "example": 40 },
+                    "paymentStatus": {
+                        "type": "string",
+                        "example": "PENDING",
+                        "enum": ["PENDING", "PAID", "FAILED"]
+                    },
+                    "extensionStatus": {
+                        "type": "string",
+                        "example": "NONE",
+                        "enum": ["NONE", "PENDING", "ACCEPTED", "DENIED"]
+                    },
+                    "extensionHours": { "type": "integer", "nullable": true, "example": null },
+                    "extensionAmount": { "type": "number", "nullable": true, "example": null },
+                    "cancellationReason": { "type": "string", "nullable": true, "example": null },
+                    "cancellationReasonCode": { "type": "string", "nullable": true, "example": null },
+                    "otpVerified": { "type": "boolean", "example": false },
+                    "createdAt": { "type": "string", "format": "date-time", "example": "2026-07-23T10:00:00.000Z" },
+                    "companion": {
+                        "type": "object",
+                        "properties": {
+                            "id": { "type": "integer", "example": 3 },
+                            "user": { "$ref": "#/components/schemas/BookingListCompanionSummary" }
+                        }
+                    },
+                    "client": { "$ref": "#/components/schemas/BookingListUserSummary" }
+                }
+            },
+            "BookingListResponse": {
+                "type": "object",
+                "properties": {
+                    "status": { "type": "boolean", "example": true },
+                    "msg": { "type": "string", "example": "Client bookings fetched successfully" },
+                    "data": {
+                        "type": "array",
+                        "items": { "$ref": "#/components/schemas/BookingListItem" }
+                    }
+                }
+            },
             "CompanionDto": {
                 "type": "object",
                 "properties": {
@@ -2070,6 +2139,412 @@
                 }
             }
         },
+        "/booking/cancel-reasons": {
+            "get": {
+                "tags": ["Booking"],
+                "summary": "List booking cancellation reason codes",
+                "security": [{ "bearerAuth": [] }],
+                "responses": {
+                    "200": {
+                        "description": "Reasons fetched successfully",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "status": true,
+                                    "msg": "Cancellation reasons fetched successfully",
+                                    "data": [
+                                        { "code": "CHANGE_OF_PLANS", "label": "Change of plans" }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/booking/detail/{id}": {
+            "get": {
+                "tags": ["Booking"],
+                "summary": "Get booking details",
+                "security": [{ "bearerAuth": [] }],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": { "type": "integer" }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Booking detail including paymentSummary and companionProfile",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "status": true,
+                                    "msg": "Booking fetched successfully",
+                                    "data": {
+                                        "id": 1,
+                                        "status": "PENDING",
+                                        "activity": "Fine Dining",
+                                        "paymentSummary": {
+                                            "durationHours": 2,
+                                            "durationLabel": "2 Hours",
+                                            "hourlyRate": 20,
+                                            "grossAmount": 40,
+                                            "platformFee": 4,
+                                            "companionNetAmount": 36,
+                                            "expectedCompanionEarnings": 36,
+                                            "currency": "USD",
+                                            "paymentStatus": "PENDING"
+                                        },
+                                        "client": { "id": 5, "username": "Elena R.", "age": 28 },
+                                        "companionProfile": {
+                                            "id": 10,
+                                            "rating": 4.8,
+                                            "user": { "username": "Kenji", "gallery": [] }
+                                        },
+                                        "viewerRole": "COMPANION",
+                                        "requestExpiresAt": "2026-07-23T15:14:59.000Z"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+                    "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } }
+                }
+            }
+        },
+        "/booking/receipt/{id}": {
+            "get": {
+                "tags": ["Booking"],
+                "summary": "Get booking payment receipt",
+                "security": [{ "bearerAuth": [] }],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": { "type": "integer" }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Receipt with gross, platform fee, and companion net credit",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "status": true,
+                                    "msg": "Booking receipt fetched successfully",
+                                    "data": {
+                                        "bookingId": 1,
+                                        "currency": "USD",
+                                        "grossBookingPrice": 40,
+                                        "platformFee": 4,
+                                        "platformFeePercent": 10,
+                                        "totalCreditedAmount": 36,
+                                        "paymentStatus": "PAID",
+                                        "transactions": []
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": { "description": "Booking not paid", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } }
+                }
+            }
+        },
+        "/booking/cancel/{id}": {
+            "post": {
+                "tags": ["Booking"],
+                "summary": "Cancel booking with reason code",
+                "security": [{ "bearerAuth": [] }],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": { "type": "integer" }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["reasonCode"],
+                                "properties": {
+                                    "reasonCode": {
+                                        "type": "string",
+                                        "enum": [
+                                            "CHANGE_OF_PLANS",
+                                            "COMPANION_NOT_ARRIVING",
+                                            "CLIENT_NOT_AVAILABLE",
+                                            "WRONG_LOCATION",
+                                            "SCHEDULE_CONFLICT",
+                                            "FOUND_ANOTHER_COMPANION",
+                                            "OTHER"
+                                        ]
+                                    },
+                                    "reasonText": { "type": "string" }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": { "description": "Booking cancelled" },
+                    "400": { "description": "Validation error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+                    "403": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+                    "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } }
+                }
+            }
+        },
+        "/booking/reschedule/{id}": {
+            "patch": {
+                "tags": ["Booking"],
+                "summary": "Reschedule a booking (client only)",
+                "security": [{ "bearerAuth": [] }],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": { "type": "integer" }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["date", "startTime", "endTime"],
+                                "properties": {
+                                    "date": { "type": "string", "format": "date-time" },
+                                    "startTime": { "type": "string", "format": "date-time" },
+                                    "endTime": { "type": "string", "format": "date-time" },
+                                    "latitude": { "type": "number" },
+                                    "longitude": { "type": "number" },
+                                    "address": { "type": "string" },
+                                    "activity": { "type": "string" }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Booking rescheduled successfully; status reset to PENDING and pricing recalculated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": { "type": "boolean", "example": true },
+                                        "msg": { "type": "string", "example": "Booking rescheduled successfully" },
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": { "type": "integer", "example": 1 },
+                                                "clientId": { "type": "integer", "example": 5 },
+                                                "companionId": { "type": "integer", "example": 3 },
+                                                "date": { "type": "string", "format": "date-time", "example": "2026-07-24T00:00:00.000Z" },
+                                                "startTime": { "type": "string", "format": "date-time", "example": "2026-07-24T18:00:00.000Z" },
+                                                "endTime": { "type": "string", "format": "date-time", "example": "2026-07-24T20:00:00.000Z" },
+                                                "latitude": { "type": "number", "example": 35.6895 },
+                                                "longitude": { "type": "number", "example": 139.6917 },
+                                                "address": { "type": "string", "example": "Updated Restaurant Name" },
+                                                "activity": { "type": "string", "example": "Fine Dining" },
+                                                "status": { "type": "string", "example": "PENDING" },
+                                                "totalAmount": { "type": "number", "example": 40 },
+                                                "grossAmount": { "type": "number", "example": 40 },
+                                                "platformFee": { "type": "number", "example": 4 },
+                                                "companionNetAmount": { "type": "number", "example": 36 },
+                                                "paymentStatus": { "type": "string", "example": "PENDING" },
+                                                "otpVerified": { "type": "boolean", "example": false },
+                                                "extensionStatus": { "type": "string", "example": "NONE" },
+                                                "extensionPaymentStatus": { "type": "string", "example": "PENDING" },
+                                                "createdAt": { "type": "string", "format": "date-time" },
+                                                "updatedAt": { "type": "string", "format": "date-time" }
+                                            }
+                                        }
+                                    }
+                                },
+                                "example": {
+                                    "status": true,
+                                    "msg": "Booking rescheduled successfully"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error, invalid booking id, wrong status, or paid booking",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ApiError" },
+                                "examples": {
+                                    "validation": {
+                                        "summary": "Invalid body",
+                                        "value": { "status": false, "msg": "\"date\" is required" }
+                                    },
+                                    "invalidId": {
+                                        "summary": "Invalid booking id",
+                                        "value": { "status": false, "msg": "Invalid booking id" }
+                                    },
+                                    "wrongStatus": {
+                                        "summary": "Not pending or accepted",
+                                        "value": { "status": false, "msg": "Only pending or accepted bookings can be rescheduled" }
+                                    },
+                                    "paidBooking": {
+                                        "summary": "Already paid",
+                                        "value": {
+                                            "status": false,
+                                            "msg": "Paid bookings cannot be rescheduled. Cancel and create a new booking instead."
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Only the client who created the booking can reschedule",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ApiError" },
+                                "example": {
+                                    "status": false,
+                                    "msg": "Only the client can reschedule this booking"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Booking not found",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ApiError" },
+                                "example": { "status": false, "msg": "Booking not found" }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ApiError" },
+                                "example": { "status": false, "msg": "Internal server error" }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/booking/verify-otp/{id}": {
+            "post": {
+                "tags": ["Booking"],
+                "summary": "Verify booking OTP before start",
+                "security": [{ "bearerAuth": [] }],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": { "type": "integer" }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["otp"],
+                                "properties": {
+                                    "otp": { "type": "string", "minLength": 4, "maxLength": 4 }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "OTP verified",
+                        "content": {
+                            "application/json": {
+                                "example": {
+                                    "status": true,
+                                    "msg": "Booking OTP verified successfully",
+                                    "data": { "id": 1, "otpVerified": true }
+                                }
+                            }
+                        }
+                    },
+                    "400": { "description": "Invalid OTP", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+                    "403": { "description": "Client only", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } }
+                }
+            }
+        },
+        "/booking/request-extension/{id}": {
+            "post": {
+                "tags": ["Booking"],
+                "summary": "Request booking extension",
+                "security": [{ "bearerAuth": [] }],
+                "parameters": [
+                    { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["extensionHours"],
+                                "properties": {
+                                    "extensionHours": { "type": "number", "minimum": 1 }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": { "description": "Extension request sent" },
+                    "400": { "description": "Validation error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+                    "403": { "description": "Client only", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } }
+                }
+            }
+        },
+        "/booking/respond-extension/{id}": {
+            "post": {
+                "tags": ["Booking"],
+                "summary": "Accept or deny extension (charges client wallet on accept)",
+                "security": [{ "bearerAuth": [] }],
+                "parameters": [
+                    { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["action"],
+                                "properties": {
+                                    "action": { "type": "string", "enum": ["ACCEPT", "DENY"] }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": { "description": "Extension response recorded" },
+                    "400": { "description": "Insufficient balance or invalid state", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+                    "403": { "description": "Companion only", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } }
+                }
+            }
+        },
         "/feed/impression": {
             "post": {
                 "tags": [
@@ -3201,7 +3676,7 @@
                 }
             }
         },
-        "/api/booking/client": {
+        "/booking/client": {
             "get": {
                 "tags": [
                     "Booking"
@@ -3217,16 +3692,17 @@
                     {
                         "in": "query",
                         "name": "type",
-                        "required": true,
+                        "required": false,
                         "schema": {
                             "type": "string",
                             "enum": [
                                 "requests",
+                                "pending",
                                 "upcoming",
                                 "history"
                             ]
                         },
-                        "description": "Filter bookings by type"
+                        "description": "Filter bookings by type (pending is an alias for requests)"
                     }
                 ],
                 "responses": {
@@ -3235,29 +3711,70 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "status": {
-                                            "type": "boolean"
-                                        },
-                                        "msg": {
-                                            "type": "string"
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "object"
+                                    "$ref": "#/components/schemas/BookingListResponse"
+                                },
+                                "example": {
+                                    "status": true,
+                                    "msg": "Client bookings fetched successfully",
+                                    "data": [
+                                        {
+                                            "id": 1,
+                                            "status": "PENDING",
+                                            "date": "2026-07-23T00:00:00.000Z",
+                                            "startTime": "2026-07-23T00:00:00.000Z",
+                                            "endTime": "2026-07-23T02:00:00.000Z",
+                                            "address": "Nwab Restaurant",
+                                            "activity": "Fine Dining",
+                                            "totalAmount": 40,
+                                            "paymentStatus": "PENDING",
+                                            "extensionStatus": "NONE",
+                                            "extensionHours": null,
+                                            "extensionAmount": null,
+                                            "cancellationReason": null,
+                                            "cancellationReasonCode": null,
+                                            "otpVerified": false,
+                                            "createdAt": "2026-07-23T10:00:00.000Z",
+                                            "companion": {
+                                                "id": 3,
+                                                "user": {
+                                                    "username": "Kenji Sato",
+                                                    "profileImage": "https://cdn.jikanzo.com/users/10/avatar.jpg",
+                                                    "age": 32
+                                                }
+                                            },
+                                            "client": {
+                                                "id": 5,
+                                                "username": "Elena R.",
+                                                "profileImage": "https://cdn.jikanzo.com/users/5/avatar.jpg",
+                                                "age": 28
                                             }
                                         }
-                                    }
+                                    ]
                                 }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ApiError" },
+                                "example": { "status": false, "msg": "Not authorized, no token" }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ApiError" }
                             }
                         }
                     }
                 }
             }
         },
-        "/api/booking/companion": {
+        "/booking/companion": {
             "get": {
                 "tags": [
                     "Booking"
@@ -3273,16 +3790,17 @@
                     {
                         "in": "query",
                         "name": "type",
-                        "required": true,
+                        "required": false,
                         "schema": {
                             "type": "string",
                             "enum": [
                                 "requests",
+                                "pending",
                                 "upcoming",
                                 "history"
                             ]
                         },
-                        "description": "Filter bookings by type"
+                        "description": "Filter bookings by type (pending is an alias for requests)"
                     }
                 ],
                 "responses": {
@@ -3291,22 +3809,71 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "status": {
-                                            "type": "boolean"
-                                        },
-                                        "msg": {
-                                            "type": "string"
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "object"
+                                    "$ref": "#/components/schemas/BookingListResponse"
+                                },
+                                "example": {
+                                    "status": true,
+                                    "msg": "Companion bookings fetched successfully",
+                                    "data": [
+                                        {
+                                            "id": 1,
+                                            "status": "PENDING",
+                                            "date": "2026-07-23T00:00:00.000Z",
+                                            "startTime": "2026-07-23T00:00:00.000Z",
+                                            "endTime": "2026-07-23T02:00:00.000Z",
+                                            "address": "Nwab Restaurant",
+                                            "activity": "Fine Dining",
+                                            "totalAmount": 40,
+                                            "paymentStatus": "PAID",
+                                            "extensionStatus": "NONE",
+                                            "extensionHours": null,
+                                            "extensionAmount": null,
+                                            "cancellationReason": null,
+                                            "cancellationReasonCode": null,
+                                            "otpVerified": false,
+                                            "createdAt": "2026-07-23T10:00:00.000Z",
+                                            "companion": {
+                                                "id": 3,
+                                                "user": {
+                                                    "username": "Kenji Sato",
+                                                    "profileImage": "https://cdn.jikanzo.com/users/10/avatar.jpg",
+                                                    "age": 32
+                                                }
+                                            },
+                                            "client": {
+                                                "id": 5,
+                                                "username": "Elena R.",
+                                                "profileImage": "https://cdn.jikanzo.com/users/5/avatar.jpg",
+                                                "age": 28
                                             }
                                         }
-                                    }
+                                    ]
                                 }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Companion profile not found",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ApiError" },
+                                "example": { "status": false, "msg": "Companion profile not found" }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ApiError" }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ApiError" }
                             }
                         }
                     }
@@ -4120,13 +4687,13 @@
                 }
             }
         },
-        "/api/booking/{id}/start": {
+        "/booking/start/{id}": {
             "post": {
                 "tags": [
                     "Booking"
                 ],
                 "summary": "Start a booking",
-                "description": "Start a booking by its ID. Changes status from ACCEPTED to ACTIVE. Only the assigned companion or the client can start the booking.",
+                "description": "Start a booking by its ID. Changes status from ACCEPTED to ACTIVE after OTP verification. Only the assigned companion or the client can start the booking.",
                 "parameters": [
                     {
                         "name": "id",
@@ -4140,19 +4707,51 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Booking started successfully"
+                        "description": "Booking started successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": { "type": "boolean" },
+                                        "msg": { "type": "string" },
+                                        "data": { "type": "object" }
+                                    }
+                                }
+                            }
+                        }
                     },
                     "400": {
-                        "description": "Bad Request (e.g., booking not in ACCEPTED state)"
+                        "description": "Bad Request (e.g., OTP not verified or booking not ACCEPTED)",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ApiError" }
+                            }
+                        }
                     },
                     "403": {
-                        "description": "Unauthorized"
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ApiError" }
+                            }
+                        }
                     },
                     "404": {
-                        "description": "Booking not found"
+                        "description": "Booking not found",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ApiError" }
+                            }
+                        }
                     },
                     "500": {
-                        "description": "Internal server error"
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ApiError" }
+                            }
+                        }
                     }
                 },
                 "security": [
