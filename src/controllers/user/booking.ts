@@ -69,7 +69,8 @@ export const bookCompanion = async (req: Request, res: Response) => {
           companion.userId,
           "New Booking Request",
           "You have received a new booking request.",
-          { bookingId: booking.id }
+          { bookingId: booking.id },
+          "NEW_BOOKING_REQUEST"
         );
       }
     }).catch(err => console.error("Failed to send notification:", err));

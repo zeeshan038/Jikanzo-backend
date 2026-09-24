@@ -6,6 +6,7 @@ dotenv.config();
 
 //Config
 import prisma from './config/db';
+import './config/firebase';
 
 //Paths
 import routes from './routes/user/index';

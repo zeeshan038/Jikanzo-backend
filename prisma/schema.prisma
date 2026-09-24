@@ -142,6 +142,7 @@ model Notification {
   title     String
   body      String
   data      Json?
+  type      String?
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
 
