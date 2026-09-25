@@ -31,9 +31,9 @@ export const getCompanionsFeed = async (req: Request, res: Response) => {
         const whereClause: any = {
             user: {
                 is: {
-                    role: 'COMPANION'
-                }
-            }
+                    role: { in: ['COMPANION', 'BOTH'] },
+                },
+            },
         };
 
         if (search) {

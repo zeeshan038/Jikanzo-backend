@@ -729,7 +729,8 @@ export const getBookingById = async (req: Request, res: Response) => {
       msg: "Booking fetched successfully",
       data: {
         ...payload,
-        viewerRole: isClient ? "CLIENT" : isCompanion ? "COMPANION" : "UNKNOWN",
+        viewerRole:
+          isClient && isCompanion ? "BOTH" : isClient ? "CLIENT" : isCompanion ? "COMPANION" : "UNKNOWN",
       },
     });
   } catch (error: any) {
@@ -780,7 +781,8 @@ export const getBookingReceipt = async (req: Request, res: Response) => {
         platformFeePercent: breakdown.platformFeePercent,
         totalCreditedAmount: breakdown.companionNetAmount,
         paymentStatus: booking.paymentStatus,
-        viewerRole: isClient ? "CLIENT" : isCompanion ? "COMPANION" : "UNKNOWN",
+        viewerRole:
+          isClient && isCompanion ? "BOTH" : isClient ? "CLIENT" : isCompanion ? "COMPANION" : "UNKNOWN",
         transactions,
       },
     });

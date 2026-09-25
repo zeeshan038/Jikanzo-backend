@@ -80,3 +80,40 @@ export const markAsRead = async (req: Request, res: Response) => {
     });
   }
 };
+
+
+/**
+ * @Description Delete Notification
+ * @Route DELETE /api/notification/delete/:id
+ * @Access Private
+ */
+export const deleteNotifications = async (req: Request, res: Response) => {
+  const { id: userId } = (req as any).user;
+  const { id } = req.params;
+
+  try {
+    const notificationId = parseInt(id, 10);
+    if (Number.isNaN(notificationId)) {
+      return res.status(400).json({ status: false, msg: "Invalid notification ID" });
+    }
+
+    const deleted = await prisma.notification.deleteMany({
+      where: { id: notificationId, userId },
+    });
+
+    if (deleted.count === 0) {
+      return res.status(404).json({ status: false, msg: "Notification not found" });
+    }
+
+    return res.status(200).json({
+      status: true,
+      msg: "Notification deleted successfully",
+      data: { id: notificationId },
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      status: false,
+      msg: error.message,
+    });
+  }
+};

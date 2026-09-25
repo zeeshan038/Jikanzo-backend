@@ -4945,6 +4945,92 @@
                 ]
             }
         },
+        "/api/notification/delete/{id}": {
+            "delete": {
+                "tags": [
+                    "Notification"
+                ],
+                "summary": "Delete a notification",
+                "description": "Delete a single notification by ID. Only notifications belonging to the authenticated user can be deleted.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "Notification ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Notification deleted successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": { "type": "boolean", "example": true },
+                                        "msg": { "type": "string", "example": "Notification deleted successfully" },
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": { "type": "integer", "example": 12 }
+                                            }
+                                        }
+                                    }
+                                },
+                                "example": {
+                                    "status": true,
+                                    "msg": "Notification deleted successfully",
+                                    "data": { "id": 12 }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid notification ID",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ApiError" },
+                                "example": { "status": false, "msg": "Invalid notification ID" }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Notification not found or not owned by user",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ApiError" },
+                                "example": { "status": false, "msg": "Notification not found" }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ApiError" }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ApiError" }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/companion/update-fcm": {
             "post": {
                 "tags": [
