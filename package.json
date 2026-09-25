@@ -7,7 +7,8 @@
     "start": "node dist/index.js",
     "dev": "nodemon src/index.ts",
     "build": "tsc",
-    "test": "vitest"
+    "test": "vitest",
+    "test:sockets": "ts-node scripts/test-booking-sockets.ts"
   },
   "keywords": [],
   "author": "",
@@ -23,6 +24,7 @@
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.3.0",
     "node-cron": "^4.6.0",
+    "socket.io": "^4.8.4",
     "stripe": "^22.6.0",
     "swagger-ui-express": "^5.0.1"
   },
@@ -37,6 +39,7 @@
     "@types/swagger-ui-express": "^4.1.8",
     "nodemon": "^3.1.0",
     "prisma": "^5.22.0",
+    "socket.io-client": "^4.8.4",
     "supertest": "^7.2.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.5",

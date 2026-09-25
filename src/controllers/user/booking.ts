@@ -12,6 +12,7 @@ import { calculateJSS } from "../../utils/jssCalculator";
 import { BOOKING_CANCEL_REASONS, isValidCancelReasonCode } from "../../constants/bookingCancelReasons";
 import { chargeBookingFromWallet } from "../../utils/bookingWallet";
 import {
+  BOOKING_REQUEST_EXPIRY_MS,
   bookingDetailInclude,
   buildClientSummary,
   buildCompanionPublicProfile,
@@ -20,6 +21,10 @@ import {
   normalizeBookingListType,
   recalculateBookingAmount,
 } from "../../utils/bookingHelpers";
+import {
+  emitBookingRequestNew,
+  emitBookingRequestUpdated,
+} from "../../sockets";
 import { getStoredOrComputedBreakdown } from "../../utils/bookingFinance";
 
 /**
@@ -96,6 +101,10 @@ export const bookCompanion = async (req: Request, res: Response) => {
         );
       }
     }).catch(err => console.error("Failed to send notification:", err));
+
+    emitBookingRequestNew(booking.id, Number(companionId)).catch((err) =>
+      console.error("[Socket] emitBookingRequestNew:", err)
+    );
 
     return res.status(201).json({
       status: true,
@@ -189,6 +198,10 @@ export const acceptBookingController = async (req: Request, res: Response) => {
       // Run asynchronously
       calculateJSS(booking.companionId).catch(err => console.error("JSS Calculation Error:", err));
     }
+
+    emitBookingRequestUpdated(bookingId).catch((err) =>
+      console.error("[Socket] emitBookingRequestUpdated:", err)
+    );
 
     return res.status(200).json({
       status: true,
@@ -692,7 +705,7 @@ export const getBookingById = async (req: Request, res: Response) => {
 
     const { booking, isClient, isCompanion } = result as Exclude<typeof result, { error: unknown }>;
     const paymentSummary = buildPaymentSummary(booking);
-    const expiresAt = new Date(booking.createdAt.getTime() + 30 * 60 * 1000);
+    const expiresAt = new Date(booking.createdAt.getTime() + BOOKING_REQUEST_EXPIRY_MS);
 
     const payload: Record<string, unknown> = {
       id: booking.id,
@@ -867,6 +880,10 @@ export const cancelBookingController = async (req: Request, res: Response) => {
       calculateJSS(booking.companionId).catch((err) => console.error("JSS Calculation Error:", err));
     }
 
+    emitBookingRequestUpdated(bookingId).catch((err) =>
+      console.error("[Socket] emitBookingRequestUpdated:", err)
+    );
+
     return res.status(200).json({
       status: true,
       msg: "Booking cancelled successfully",
@@ -950,6 +967,10 @@ export const rescheduleBookingController = async (req: Request, res: Response) =
         otpVerified: false,
       },
     });
+
+    emitBookingRequestUpdated(bookingId).catch((err) =>
+      console.error("[Socket] emitBookingRequestUpdated:", err)
+    );
 
     return res.status(200).json({
       status: true,

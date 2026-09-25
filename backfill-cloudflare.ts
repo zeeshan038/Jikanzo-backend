@@ -3,7 +3,7 @@ import { generateUniqueCloudflareId, ensureR2UserFolders } from './src/utils/clo
 
 async function main() {
     console.log("Fetching users without a Cloudflare ID...");
-    
+
     // Find all users who don't have a cloudflareId yet
     const usersWithoutId = await prisma.user.findMany({
         where: {
@@ -24,10 +24,10 @@ async function main() {
     for (const user of usersWithoutId) {
         try {
             console.log(`Processing user ${user.username} (ID: ${user.id})...`);
-            
+
             // 1. Generate unique ID
             const newCloudflareId = await generateUniqueCloudflareId();
-            
+
             // 2. Update user in the database
             await prisma.user.update({
                 where: { id: user.id },
@@ -38,7 +38,7 @@ async function main() {
             // 3. Create R2 folders
             await ensureR2UserFolders(newCloudflareId);
             console.log(`  -> R2 Folders created!`);
-            
+
         } catch (error) {
             console.error(`Failed to process user ${user.id}:`, error);
         }

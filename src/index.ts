@@ -2,6 +2,7 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import http from 'http';
 dotenv.config();
 
 //Config
@@ -11,6 +12,7 @@ import './config/firebase';
 //Paths
 import routes from './routes/user/index';
 import './cron/booking';
+import { initSockets } from './sockets';
 
 const app = express();
 
@@ -57,7 +59,9 @@ app.use('/api',routes);
 const port = process.env.PORT || 3000;
 
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(port, () => {
+  const httpServer = http.createServer(app);
+  initSockets(httpServer);
+  httpServer.listen(port, () => {
     console.log(`Server is running at http://localhost:${port}`);
   });
 }

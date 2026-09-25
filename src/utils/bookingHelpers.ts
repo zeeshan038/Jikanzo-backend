@@ -1,6 +1,8 @@
 import { Booking, CompanionProfile, User } from '@prisma/client';
 import { calculatePaymentBreakdown, getStoredOrComputedBreakdown } from './bookingFinance';
 
+export const BOOKING_REQUEST_EXPIRY_MS = 30 * 60 * 1000;
+
 export const bookingDurationHours = (startTime: Date, endTime: Date): number => {
   const durationMs = endTime.getTime() - startTime.getTime();
   return durationMs > 0 ? Math.round((durationMs / (1000 * 60 * 60)) * 100) / 100 : 0;
