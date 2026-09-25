@@ -3,8 +3,8 @@ import prisma from "../../config/db";
 
 
 /**
- * @Description Get all of the companions 
- * @Route GET /api/feed/all?search=&offset=&limit=&sortby=relevance&gender=male&minrating=0&maxhourlyrate=0&maxdistance=10
+ * @Description Get ranked companion feed with filters and pagination
+ * @Route GET /api/feed/get-feed?search=&gender=&activityTypes=&languages=&trustRank=&rating=&minPrice=&maxPrice=&page=1&limit=10
  * @Access Private
  */
 export const getCompanionsFeed = async (req: Request, res: Response) => {

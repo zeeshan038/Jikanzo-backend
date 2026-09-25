@@ -7,11 +7,12 @@ services:
     restart: always
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     environment:
       - PORT=3000
       - DATABASE_URL=postgresql://postgres:mysecretpassword@postgres:5432/jikanzo_docker_db?schema=public
       - REDIS_URL=redis://redis:6379
-      - JWT_SECRET=your_jwt_secret_here 
     depends_on:
       - postgres
       - redis
