@@ -334,6 +334,57 @@
                     "data": { "$ref": "#/components/schemas/BookingDetailData" }
                 }
             },
+            "AddReviewRequest": {
+                "type": "object",
+                "required": ["companionId", "rating"],
+                "properties": {
+                    "companionId": {
+                        "type": "integer",
+                        "description": "CompanionProfile.id (not User.id)",
+                        "example": 220
+                    },
+                    "rating": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 5,
+                        "example": 5
+                    },
+                    "comment": {
+                        "type": "string",
+                        "nullable": true,
+                        "example": "Great experience, very professional."
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "example": ["Punctual", "Friendly"]
+                    }
+                }
+            },
+            "ReviewDto": {
+                "type": "object",
+                "properties": {
+                    "id": { "type": "integer", "example": 42 },
+                    "clientId": { "type": "integer", "example": 228 },
+                    "companionId": { "type": "integer", "example": 220 },
+                    "rating": { "type": "integer", "example": 5 },
+                    "comment": { "type": "string", "nullable": true, "example": "Great experience, very professional." },
+                    "tags": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "example": ["Punctual", "Friendly"]
+                    },
+                    "createdAt": { "type": "string", "format": "date-time", "example": "2026-09-27T01:00:00.000Z" }
+                }
+            },
+            "AddReviewResponse": {
+                "type": "object",
+                "properties": {
+                    "status": { "type": "boolean", "example": true },
+                    "msg": { "type": "string", "example": "Review submitted successfully" },
+                    "data": { "$ref": "#/components/schemas/ReviewDto" }
+                }
+            },
             "CompanionDto": {
                 "type": "object",
                 "properties": {
@@ -2797,6 +2848,7 @@
             "post": {
                 "tags": ["Booking"],
                 "summary": "Verify booking OTP before start",
+                "description": "Client or assigned companion may submit the 4-digit OTP to mark the booking as verified before start.",
                 "security": [{ "bearerAuth": [] }],
                 "parameters": [
                     {
@@ -2834,7 +2886,10 @@
                         }
                     },
                     "400": { "description": "Invalid OTP", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
-                    "403": { "description": "Client only", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } }
+                    "403": {
+                        "description": "Not the booking client or assigned companion",
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } }
+                    }
                 }
             }
         },
@@ -2893,6 +2948,86 @@
                     "200": { "description": "Extension response recorded" },
                     "400": { "description": "Insufficient balance or invalid state", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
                     "403": { "description": "Companion only", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } }
+                }
+            }
+        },
+        "/review": {
+            "post": {
+                "tags": ["Review"],
+                "summary": "Submit a review for a companion",
+                "description": "Authenticated client only. Requires at least one COMPLETED booking with the companion. One review per client per companion. Updates the companion's average rating on CompanionProfile.",
+                "security": [{ "bearerAuth": [] }],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": { "$ref": "#/components/schemas/AddReviewRequest" }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Review submitted successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/AddReviewResponse" }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid input or duplicate review",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ApiError" },
+                                "examples": {
+                                    "validation": {
+                                        "summary": "Missing or invalid rating",
+                                        "value": {
+                                            "status": false,
+                                            "msg": "Valid companionId and rating (1-5) are required"
+                                        }
+                                    },
+                                    "duplicate": {
+                                        "summary": "Already reviewed",
+                                        "value": {
+                                            "status": false,
+                                            "msg": "You have already reviewed this companion"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ApiError" },
+                                "example": { "status": false, "msg": "Not authorized, no token" }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "No completed booking with this companion",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ApiError" },
+                                "example": {
+                                    "status": false,
+                                    "msg": "You can only review companions you have had completed bookings with."
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ApiError" },
+                                "example": { "status": false, "msg": "Internal server error" }
+                            }
+                        }
+                    }
                 }
             }
         },

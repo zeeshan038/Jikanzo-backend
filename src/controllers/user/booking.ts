@@ -999,14 +999,25 @@ export const verifyBookingOtpController = async (req: Request, res: Response) =>
   }
 
   try {
-    const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { companion: true },
+    });
 
     if (!booking) {
       return res.status(404).json({ status: false, msg: "Booking not found" });
     }
 
-    if (booking.clientId !== userId) {
-      return res.status(403).json({ status: false, msg: "Only the client can verify the booking OTP" });
+    const companionProfile = await prisma.companionProfile.findFirst({ where: { userId } });
+    const isClient = booking.clientId === userId;
+    const isCompanion =
+      companionProfile != null && booking.companionId === companionProfile.id;
+
+    if (!isClient && !isCompanion) {
+      return res.status(403).json({
+        status: false,
+        msg: "Only the client or assigned companion can verify the booking OTP",
+      });
     }
 
     if (!["ACCEPTED", "ACTIVE"].includes(booking.status)) {
