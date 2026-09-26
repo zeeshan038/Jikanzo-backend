@@ -13,6 +13,9 @@ services:
       - PORT=3000
       - DATABASE_URL=postgresql://postgres:mysecretpassword@postgres:5432/jikanzo_docker_db?schema=public
       - REDIS_URL=redis://redis:6379
+      - FIREBASE_ADMIN_SDK_PATH=/run/secrets/firebase-admin.json
+    volumes:
+      - ./secrets/firebase-admin.json:/run/secrets/firebase-admin.json:ro
     depends_on:
       - postgres
       - redis
