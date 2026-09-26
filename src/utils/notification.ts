@@ -1,13 +1,21 @@
 import prisma from "../config/db";
 import { getMessaging } from "firebase-admin/messaging";
 
+export type PushNotificationResult = {
+  savedToDb: boolean;
+  fcmSent: boolean;
+  messageId?: string;
+  skipReason?: string;
+  error?: string;
+};
+
 export const sendPushNotification = async (
   userId: number,
   title: string,
   body: string,
   data: any = {},
   type?: string
-): Promise<void> => {
+): Promise<PushNotificationResult> => {
   try {
     // 1. Create the notification in the database
     await prisma.notification.create({
@@ -47,10 +55,17 @@ export const sendPushNotification = async (
 
       const response = await getMessaging().send(message);
       console.log(`[Push Notification Sent] -> User ID: ${userId}, Message ID: ${response}`);
-    } else {
-      console.log(`[Push Notification Skipped] -> User ID: ${userId} (No FCM Token found)`);
+      return { savedToDb: true, fcmSent: true, messageId: response };
     }
-  } catch (error) {
+
+    console.log(`[Push Notification Skipped] -> User ID: ${userId} (No FCM Token found)`);
+    return { savedToDb: true, fcmSent: false, skipReason: "NO_FCM_TOKEN" };
+  } catch (error: any) {
     console.error("[Push Notification Error]: Failed to save or send notification", error);
+    return {
+      savedToDb: false,
+      fcmSent: false,
+      error: error?.message || "Failed to send push notification",
+    };
   }
 };

@@ -6,7 +6,8 @@ import {
   buildCompanionPublicProfile,
   buildPaymentSummary,
 } from '../utils/bookingHelpers';
-import { BOOKING_REQUEST_EXPIRY_MS, SOCKET_EVENTS } from './constants';
+import { 
+  BOOKING_REQUEST_EXPIRY_MS, SOCKET_EVENTS } from './constants';
 import { bookingRoom, companionRoom, userRoom } from './rooms';
 
 let io: Server | null = null;

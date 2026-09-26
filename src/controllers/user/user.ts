@@ -19,6 +19,8 @@ import {
     generateUniqueCloudflareId,
     ensureR2UserFolders
 } from '../../utils/cloudflare';
+import { sendPushNotification } from '../../utils/notification';
+import { getMessaging } from 'firebase-admin/messaging';
 
 
 /**
@@ -655,3 +657,89 @@ export const uploadGallery = async (req: Request, res: Response): Promise<any> =
         });
     }
 }
+
+
+/**
+ * @Description Test Push Notification (no auth — dev/testing only)
+ * @Method POST api/user/test-push
+ * @Access Public
+ */
+export const testPushNotification = async (req: Request, res: Response): Promise<any> => {
+    const { fcm, title, body, userId: userIdRaw } = req.body;
+
+    if (fcm == null || typeof fcm !== 'string' || !fcm.trim()) {
+        return res.status(400).json({
+            status: false,
+            msg: 'fcm is required (device FCM token)',
+        });
+    }
+
+    const token = fcm.trim();
+    const notifTitle =
+        typeof title === 'string' && title.trim() ? title.trim() : 'Jikanzo test';
+    const notifBody =
+        typeof body === 'string' && body.trim()
+            ? body.trim()
+            : 'Push notifications are working.';
+
+    try {
+        const userId = userIdRaw != null ? Number(userIdRaw) : NaN;
+
+        if (Number.isFinite(userId)) {
+            await prisma.user.update({
+                where: { id: userId },
+                data: { fcmToken: token },
+            });
+
+            const result = await sendPushNotification(
+                userId,
+                notifTitle,
+                notifBody,
+                { test: 'true' },
+                'TEST_PUSH'
+            );
+
+            if (result.error) {
+                return res.status(502).json({
+                    status: false,
+                    msg: result.error,
+                    data: result,
+                });
+            }
+
+            if (!result.fcmSent) {
+                return res.status(400).json({
+                    status: false,
+                    msg: 'Notification saved but FCM was not sent.',
+                    data: result,
+                });
+            }
+
+            return res.status(200).json({
+                status: true,
+                msg: 'Test push notification sent successfully',
+                data: {
+                    userId,
+                    messageId: result.messageId,
+                },
+            });
+        }
+
+        const messageId = await getMessaging().send({
+            notification: { title: notifTitle, body: notifBody },
+            data: { test: 'true', type: 'TEST_PUSH' },
+            token,
+        });
+
+        return res.status(200).json({
+            status: true,
+            msg: 'Test push notification sent successfully',
+            data: { messageId },
+        });
+    } catch (error: any) {
+        return res.status(502).json({
+            status: false,
+            msg: error?.message || 'Failed to send push notification',
+        });
+    }
+};
