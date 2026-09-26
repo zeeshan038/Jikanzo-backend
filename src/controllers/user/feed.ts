@@ -192,10 +192,10 @@ export const getCompanionsFeed = async (req: Request, res: Response) => {
  * @Access Private
  */
 export const specificCompanion = async (req: Request, res: Response): Promise<any> => {
-    try {
-        const { userId } = req.params;
-        const currentUserId = (req as any).user.id;
+    const { userId } = req.params;
+    const currentUserId = (req as any).user.id;
 
+    try {
         const companion = await prisma.companionProfile.findUnique({
             where: { userId: Number(userId) },
             include: {
@@ -226,7 +226,15 @@ export const specificCompanion = async (req: Request, res: Response): Promise<an
                     orderBy: { createdAt: 'desc' },
                     take: 10
                 },
-                moments: true,
+                moments: {
+                    orderBy: { createdAt: 'asc' },
+                    include: {
+                        views: {
+                            where: { userId: currentUserId },
+                            select: { id: true },
+                        },
+                    },
+                },
                 savedBy: {
                     where: { userId: currentUserId }
                 }
@@ -265,6 +273,22 @@ export const specificCompanion = async (req: Request, res: Response): Promise<an
             totalDiamonds += m.diamonds || 0;
         });
 
+        const now = new Date();
+        const activeMoments = companion.moments.filter((m) => m.expiresAt > now);
+        const formattedMoments = activeMoments.map((m) => ({
+            momentId: m.id,
+            mediaUrl: m.mediaUrl,
+            caption: m.caption,
+            likes: m.likes,
+            diamonds: m.diamonds,
+            rings: m.rings,
+            createdAt: m.createdAt,
+            expiresAt: m.expiresAt,
+            isSeen: m.views.length > 0,
+        }));
+        const allMomentsSeen =
+            formattedMoments.length === 0 || formattedMoments.every((m) => m.isSeen);
+
         // Calculate Performance Stats
         const totalSessions = companion.totalSessions || 0;
         const repeatClients = companion.repeatClients || 0;
@@ -279,6 +303,8 @@ export const specificCompanion = async (req: Request, res: Response): Promise<an
         const responseData = {
             ...companionData,
             isSaved,
+            allMomentsSeen,
+            moments: formattedMoments,
             momentsAnalytics: {
                 totalLikes,
                 totalRings,
@@ -301,6 +327,7 @@ export const specificCompanion = async (req: Request, res: Response): Promise<an
         return res.status(500).json({ status: false, msg: error.message });
     }
 };
+
 
 /**
  * @Description Toggle Save Companion
@@ -355,6 +382,7 @@ export const saveCompanion = async (req: Request, res: Response): Promise<any> =
     }
 };
 
+
 /**
  * @Description Get Saved Companions
  * @Route GET /api/feed/saved-companions
@@ -399,6 +427,7 @@ export const getSavedCompanions = async (req: Request, res: Response): Promise<a
         return res.status(500).json({ status: false, msg: error.message });
     }
 };
+
 
 /**
  * @Description Log impression of a companion card
@@ -459,6 +488,7 @@ export const logImpression = async (req: Request, res: Response): Promise<any> =
         });
     }
 };
+
 
 /**
  * @Description Bulk Log impressions of multiple companion cards

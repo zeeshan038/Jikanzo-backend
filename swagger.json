@@ -1318,7 +1318,8 @@
                 "tags": [
                     "Feed"
                 ],
-                "summary": "Get specific companion profile with analytics and reviews",
+                "summary": "Get companion profile (reviews, moments, analytics)",
+                "description": "Returns a single companion profile by the companion's **User.id** (not CompanionProfile.id). Includes active **moments** for the story viewer when the client taps the profile photo, **allMomentsSeen** for the avatar ring, **momentsAnalytics** (lifetime like/ring/diamond totals), reviews, and performance stats.",
                 "security": [
                     {
                         "bearerAuth": []
@@ -1329,6 +1330,7 @@
                         "name": "userId",
                         "in": "path",
                         "required": true,
+                        "description": "Companion user id (User.id linked to CompanionProfile)",
                         "schema": {
                             "type": "integer"
                         }
@@ -1352,46 +1354,89 @@
                                             "type": "object",
                                             "properties": {
                                                 "id": {
-                                                    "type": "integer"
+                                                    "type": "integer",
+                                                    "description": "CompanionProfile.id"
+                                                },
+                                                "userId": {
+                                                    "type": "integer",
+                                                    "description": "Companion User.id"
                                                 },
                                                 "bio": {
-                                                    "type": "string"
+                                                    "type": "string",
+                                                    "nullable": true
                                                 },
                                                 "hourlyRate": {
-                                                    "type": "number"
+                                                    "type": "number",
+                                                    "nullable": true
                                                 },
                                                 "locationLat": {
-                                                    "type": "number"
+                                                    "type": "number",
+                                                    "nullable": true
                                                 },
                                                 "locationLng": {
-                                                    "type": "number"
+                                                    "type": "number",
+                                                    "nullable": true
+                                                },
+                                                "serviceRadius": {
+                                                    "type": "integer",
+                                                    "nullable": true
                                                 },
                                                 "isOnline": {
                                                     "type": "boolean"
+                                                },
+                                                "isPaused": {
+                                                    "type": "boolean"
+                                                },
+                                                "profileViews": {
+                                                    "type": "integer"
                                                 },
                                                 "rating": {
                                                     "type": "number"
                                                 },
                                                 "trustRank": {
-                                                    "type": "string"
+                                                    "type": "string",
+                                                    "description": "e.g. New, Premium"
+                                                },
+                                                "totalSessions": {
+                                                    "type": "integer"
+                                                },
+                                                "repeatClients": {
+                                                    "type": "integer"
+                                                },
+                                                "jssScore": {
+                                                    "type": "number",
+                                                    "nullable": true
+                                                },
+                                                "completedMeetups": {
+                                                    "type": "integer"
+                                                },
+                                                "reliabilityScore": {
+                                                    "type": "number"
                                                 },
                                                 "isSaved": {
-                                                    "type": "boolean"
+                                                    "type": "boolean",
+                                                    "description": "Whether the authenticated user saved this companion"
                                                 },
                                                 "user": {
                                                     "type": "object",
                                                     "properties": {
+                                                        "id": {
+                                                            "type": "integer"
+                                                        },
                                                         "username": {
                                                             "type": "string"
                                                         },
                                                         "profileImage": {
-                                                            "type": "string"
+                                                            "type": "string",
+                                                            "nullable": true
                                                         },
                                                         "age": {
-                                                            "type": "integer"
+                                                            "type": "integer",
+                                                            "nullable": true
                                                         },
                                                         "gender": {
-                                                            "type": "string"
+                                                            "type": "string",
+                                                            "nullable": true
                                                         },
                                                         "about": {
                                                             "type": "string"
@@ -1457,22 +1502,70 @@
                                                         }
                                                     }
                                                 },
+                                                "allMomentsSeen": {
+                                                    "type": "boolean",
+                                                    "description": "True if the viewer has seen all active moments (profile ring state)."
+                                                },
+                                                "moments": {
+                                                    "type": "array",
+                                                    "description": "Active (non-expired) moments for story viewer when tapping profile photo.",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "momentId": {
+                                                                "type": "integer"
+                                                            },
+                                                            "mediaUrl": {
+                                                                "type": "string"
+                                                            },
+                                                            "caption": {
+                                                                "type": "string",
+                                                                "nullable": true
+                                                            },
+                                                            "likes": {
+                                                                "type": "integer"
+                                                            },
+                                                            "diamonds": {
+                                                                "type": "integer"
+                                                            },
+                                                            "rings": {
+                                                                "type": "integer"
+                                                            },
+                                                            "createdAt": {
+                                                                "type": "string",
+                                                                "format": "date-time"
+                                                            },
+                                                            "expiresAt": {
+                                                                "type": "string",
+                                                                "format": "date-time"
+                                                            },
+                                                            "isSeen": {
+                                                                "type": "boolean"
+                                                            }
+                                                        }
+                                                    }
+                                                },
                                                 "momentsAnalytics": {
                                                     "type": "object",
+                                                    "description": "Lifetime totals summed across all moments (including expired). Shown on profile MOMENTS ANALYTICS cards.",
                                                     "properties": {
                                                         "totalLikes": {
-                                                            "type": "integer"
+                                                            "type": "integer",
+                                                            "description": "Sum of likes (heart) on all moments"
                                                         },
                                                         "totalRings": {
-                                                            "type": "integer"
+                                                            "type": "integer",
+                                                            "description": "Sum of rings on all moments"
                                                         },
                                                         "totalDiamonds": {
-                                                            "type": "integer"
+                                                            "type": "integer",
+                                                            "description": "Sum of diamonds on all moments"
                                                         }
                                                     }
                                                 },
                                                 "performance": {
                                                     "type": "object",
+                                                    "description": "Derived performance block for profile UI",
                                                     "properties": {
                                                         "rating": {
                                                             "type": "number"
@@ -1484,11 +1577,59 @@
                                                             "type": "integer"
                                                         },
                                                         "repeatRate": {
-                                                            "type": "string"
+                                                            "type": "string",
+                                                            "description": "Percentage string e.g. 42%"
                                                         }
                                                     }
                                                 }
                                             }
+                                        }
+                                    },
+                                    "example": {
+                                        "status": true,
+                                        "msg": "Companion fetched successfully",
+                                        "data": {
+                                            "id": 1,
+                                            "userId": 42,
+                                            "bio": "Gallery guide",
+                                            "hourlyRate": 40,
+                                            "isOnline": true,
+                                            "rating": 5,
+                                            "trustRank": "New",
+                                            "isSaved": false,
+                                            "allMomentsSeen": false,
+                                            "moments": [
+                                                {
+                                                    "momentId": 10,
+                                                    "mediaUrl": "https://cdn.example.com/moment.mp4",
+                                                    "caption": "At the gallery",
+                                                    "likes": 1100,
+                                                    "diamonds": 125,
+                                                    "rings": 286,
+                                                    "createdAt": "2026-09-26T10:00:00.000Z",
+                                                    "expiresAt": "2026-09-27T10:00:00.000Z",
+                                                    "isSeen": false
+                                                }
+                                            ],
+                                            "momentsAnalytics": {
+                                                "totalLikes": 1100,
+                                                "totalRings": 286,
+                                                "totalDiamonds": 125
+                                            },
+                                            "performance": {
+                                                "rating": 5,
+                                                "totalSessions": 12,
+                                                "repeatClients": 4,
+                                                "repeatRate": "33%"
+                                            },
+                                            "user": {
+                                                "id": 42,
+                                                "username": "elena",
+                                                "profileImage": "https://cdn.example.com/avatar.jpg",
+                                                "age": 28,
+                                                "gender": "Female"
+                                            },
+                                            "reviews": []
                                         }
                                     }
                                 }
