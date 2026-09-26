@@ -15,8 +15,7 @@ import {
   BOOKING_REQUEST_EXPIRY_MS,
   bookingDetailInclude,
   buildClientSummary,
-  buildCompanionPublicProfile,
-  buildPaymentSummary,
+  buildCompanionBookingDetailProfile,
   listBookingSelect,
   normalizeBookingListType,
   recalculateBookingAmount,
@@ -704,7 +703,6 @@ export const getBookingById = async (req: Request, res: Response) => {
     }
 
     const { booking, isClient, isCompanion } = result as Exclude<typeof result, { error: unknown }>;
-    const paymentSummary = buildPaymentSummary(booking);
     const expiresAt = new Date(booking.createdAt.getTime() + BOOKING_REQUEST_EXPIRY_MS);
 
     const payload: Record<string, unknown> = {
@@ -727,10 +725,9 @@ export const getBookingById = async (req: Request, res: Response) => {
       otpVerified: booking.otpVerified,
       createdAt: booking.createdAt,
       updatedAt: booking.updatedAt,
-      paymentSummary,
       requestExpiresAt: booking.status === "PENDING" ? expiresAt : null,
       client: buildClientSummary(booking),
-      companionProfile: buildCompanionPublicProfile(booking),
+      companionProfile: buildCompanionBookingDetailProfile(booking),
     };
 
     if (isClient && ["ACCEPTED", "ACTIVE"].includes(booking.status)) {

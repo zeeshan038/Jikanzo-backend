@@ -74,6 +74,7 @@ web_modules/
 # Firebase / GCP service account keys (use FIREBASE_ADMIN_SDK_JSON in .env)
 *firebase*adminsdk*.json
 *-firebase-adminsdk-*.json
+secrets/
 
 # dotenv environment variables file
 .env

@@ -1,5 +1,12 @@
 import express from 'express';
-import { getCompanionsFeed, saveCompanion, getSavedCompanions, logImpression, logImpressionBulk, specificCompanion } from '../../controllers/user/feed';
+import {
+    getCompanionsFeed,
+    saveCompanion,
+    getSavedCompanions,
+    logImpression,
+    logImpressionBulk,
+    specificCompanion
+} from '../../controllers/user/feed';
 import { verifyUser } from '../../middlewares/verifyUser';
 
 const router = express.Router();

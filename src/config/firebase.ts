@@ -8,7 +8,6 @@ try {
   if (process.env.FIREBASE_ADMIN_SDK_JSON) {
     const serviceAccount = JSON.parse(process.env.FIREBASE_ADMIN_SDK_JSON);
     
-    // Fix for escaped newlines in the private key when loaded from .env
     if (serviceAccount.private_key) {
       serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
     }

@@ -44,6 +44,23 @@ export const buildCompanionPublicProfile = (booking: BookingWithRelations) => ({
   },
 });
 
+/** Slim companion block for GET /api/booking/detail/:id */
+export const buildCompanionBookingDetailProfile = (booking: BookingWithRelations) => ({
+  id: booking.companion.id,
+  bio: booking.companion.bio,
+  rating: booking.companion.rating,
+  trustRank: booking.companion.trustRank,
+  totalSessions: booking.companion.totalSessions,
+  repeatClients: booking.companion.repeatClients,
+  completedMeetups: booking.companion.completedMeetups,
+  user: {
+    id: booking.companion.user.id,
+    username: booking.companion.user.username,
+    profileImage: booking.companion.user.profileImage,
+    age: booking.companion.user.age,
+  },
+});
+
 export const buildClientSummary = (booking: BookingWithRelations) => ({
   id: booking.client.id,
   username: booking.client.username,

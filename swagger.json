@@ -228,6 +228,112 @@
                     }
                 }
             },
+            "BookingDetailUserSummary": {
+                "type": "object",
+                "properties": {
+                    "id": { "type": "integer", "example": 228 },
+                    "username": { "type": "string", "example": "Mudassir Ahmad" },
+                    "profileImage": {
+                        "type": "string",
+                        "nullable": true,
+                        "example": "https://cdn.jikanzo.com/users/228/avatar.jpg"
+                    },
+                    "age": { "type": "integer", "nullable": true, "example": 26 }
+                }
+            },
+            "BookingDetailCompanionUserSummary": {
+                "type": "object",
+                "properties": {
+                    "id": { "type": "integer", "example": 239 },
+                    "username": { "type": "string", "example": "idrees" },
+                    "profileImage": {
+                        "type": "string",
+                        "nullable": true,
+                        "example": "https://cdn.jikanzo.com/users/239/avatar.jpg"
+                    },
+                    "age": { "type": "integer", "nullable": true, "example": 26 }
+                }
+            },
+            "BookingDetailCompanionProfile": {
+                "type": "object",
+                "properties": {
+                    "id": { "type": "integer", "example": 220 },
+                    "bio": { "type": "string", "nullable": true, "example": null },
+                    "rating": { "type": "number", "example": 0 },
+                    "trustRank": { "type": "string", "example": "New" },
+                    "totalSessions": { "type": "integer", "example": 0 },
+                    "repeatClients": { "type": "integer", "example": 0 },
+                    "completedMeetups": { "type": "integer", "example": 0 },
+                    "user": { "$ref": "#/components/schemas/BookingDetailCompanionUserSummary" }
+                }
+            },
+            "BookingDetailData": {
+                "type": "object",
+                "properties": {
+                    "id": { "type": "integer", "example": 25 },
+                    "status": {
+                        "type": "string",
+                        "enum": ["PENDING", "ACCEPTED", "ACTIVE", "COMPLETED", "CANCELLED"],
+                        "example": "ACCEPTED"
+                    },
+                    "date": { "type": "string", "format": "date-time", "example": "2026-09-26T19:00:00.000Z" },
+                    "startTime": { "type": "string", "format": "date-time", "example": "2026-09-27T06:00:00.000Z" },
+                    "endTime": { "type": "string", "format": "date-time", "example": "2026-09-27T07:00:00.000Z" },
+                    "latitude": { "type": "number", "nullable": true, "example": 51.5074 },
+                    "longitude": { "type": "number", "nullable": true, "example": -0.1278 },
+                    "address": { "type": "string", "nullable": true, "example": "Selected Location" },
+                    "activity": { "type": "string", "nullable": true, "example": "Entertainment Cafe" },
+                    "paymentStatus": {
+                        "type": "string",
+                        "enum": ["PENDING", "PAID", "FAILED"],
+                        "example": "PENDING"
+                    },
+                    "extensionStatus": {
+                        "type": "string",
+                        "enum": ["NONE", "PENDING", "ACCEPTED", "DENIED"],
+                        "example": "NONE"
+                    },
+                    "extensionHours": { "type": "number", "nullable": true, "example": null },
+                    "extensionAmount": { "type": "number", "nullable": true, "example": null },
+                    "extensionPaymentStatus": {
+                        "type": "string",
+                        "enum": ["PENDING", "PAID", "FAILED"],
+                        "example": "PENDING"
+                    },
+                    "cancellationReason": { "type": "string", "nullable": true, "example": null },
+                    "cancellationReasonCode": { "type": "string", "nullable": true, "example": null },
+                    "otpVerified": { "type": "boolean", "example": false },
+                    "createdAt": { "type": "string", "format": "date-time", "example": "2026-09-26T16:52:31.038Z" },
+                    "updatedAt": { "type": "string", "format": "date-time", "example": "2026-09-26T17:12:32.426Z" },
+                    "requestExpiresAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true,
+                        "description": "Present when status is PENDING (30 minutes from createdAt); otherwise null.",
+                        "example": null
+                    },
+                    "client": { "$ref": "#/components/schemas/BookingDetailUserSummary" },
+                    "companionProfile": { "$ref": "#/components/schemas/BookingDetailCompanionProfile" },
+                    "otp": {
+                        "type": "string",
+                        "description": "4-digit session OTP. Included only when the viewer is the client and status is ACCEPTED or ACTIVE.",
+                        "example": "2538"
+                    },
+                    "viewerRole": {
+                        "type": "string",
+                        "enum": ["CLIENT", "COMPANION", "BOTH", "UNKNOWN"],
+                        "example": "CLIENT"
+                    }
+                }
+            },
+            "BookingDetailResponse": {
+                "type": "object",
+                "properties": {
+                    "status": { "type": "boolean", "example": true },
+                    "msg": { "type": "string", "example": "Booking fetched successfully" },
+                    "data": { "$ref": "#/components/schemas/BookingDetailData" }
+                }
+            },
             "CompanionDto": {
                 "type": "object",
                 "properties": {
@@ -2354,53 +2460,110 @@
             "get": {
                 "tags": ["Booking"],
                 "summary": "Get booking details",
+                "description": "Returns booking fields for the detail screen. Only the booking client or assigned companion may access this booking. Does not include payment fee breakdown (use GET /booking/receipt/{id} for paid receipts). The `otp` field is returned only for the client when status is ACCEPTED or ACTIVE.",
                 "security": [{ "bearerAuth": [] }],
                 "parameters": [
                     {
                         "name": "id",
                         "in": "path",
                         "required": true,
+                        "description": "Booking ID",
                         "schema": { "type": "integer" }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Booking detail including paymentSummary and companionProfile",
+                        "description": "Booking fetched successfully",
                         "content": {
                             "application/json": {
+                                "schema": { "$ref": "#/components/schemas/BookingDetailResponse" },
                                 "example": {
                                     "status": true,
                                     "msg": "Booking fetched successfully",
                                     "data": {
-                                        "id": 1,
-                                        "status": "PENDING",
-                                        "activity": "Fine Dining",
-                                        "paymentSummary": {
-                                            "durationHours": 2,
-                                            "durationLabel": "2 Hours",
-                                            "hourlyRate": 20,
-                                            "grossAmount": 40,
-                                            "platformFee": 4,
-                                            "companionNetAmount": 36,
-                                            "expectedCompanionEarnings": 36,
-                                            "currency": "USD",
-                                            "paymentStatus": "PENDING"
+                                        "id": 25,
+                                        "status": "ACCEPTED",
+                                        "date": "2026-09-26T19:00:00.000Z",
+                                        "startTime": "2026-09-27T06:00:00.000Z",
+                                        "endTime": "2026-09-27T07:00:00.000Z",
+                                        "latitude": 51.5074,
+                                        "longitude": -0.1278,
+                                        "address": "Selected Location",
+                                        "activity": "Entertainment Cafe",
+                                        "paymentStatus": "PENDING",
+                                        "extensionStatus": "NONE",
+                                        "extensionHours": null,
+                                        "extensionAmount": null,
+                                        "extensionPaymentStatus": "PENDING",
+                                        "cancellationReason": null,
+                                        "cancellationReasonCode": null,
+                                        "otpVerified": false,
+                                        "createdAt": "2026-09-26T16:52:31.038Z",
+                                        "updatedAt": "2026-09-26T17:12:32.426Z",
+                                        "requestExpiresAt": null,
+                                        "client": {
+                                            "id": 228,
+                                            "username": "Mudassir Ahmad",
+                                            "profileImage": "https://cdn.jikanzo.com/9fbe45123a296ffcb7757e50fd9df76b-1790022707594.jpg",
+                                            "age": 26
                                         },
-                                        "client": { "id": 5, "username": "Elena R.", "age": 28 },
                                         "companionProfile": {
-                                            "id": 10,
-                                            "rating": 4.8,
-                                            "user": { "username": "Kenji", "gallery": [] }
+                                            "id": 220,
+                                            "bio": null,
+                                            "rating": 0,
+                                            "trustRank": "New",
+                                            "totalSessions": 0,
+                                            "repeatClients": 0,
+                                            "completedMeetups": 0,
+                                            "user": {
+                                                "id": 239,
+                                                "username": "idrees",
+                                                "profileImage": "https://cdn.jikanzo.com/b6dbbd0b0bfb5f8172210edc71fdb853-1790288501833.jpg",
+                                                "age": 26
+                                            }
                                         },
-                                        "viewerRole": "COMPANION",
-                                        "requestExpiresAt": "2026-07-23T15:14:59.000Z"
+                                        "otp": "2538",
+                                        "viewerRole": "CLIENT"
                                     }
                                 }
                             }
                         }
                     },
-                    "403": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
-                    "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } }
+                    "400": {
+                        "description": "Invalid booking id",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ApiError" },
+                                "example": { "status": false, "msg": "Invalid booking id" }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not a participant on this booking",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ApiError" },
+                                "example": { "status": false, "msg": "Unauthorized" }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Booking not found",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ApiError" },
+                                "example": { "status": false, "msg": "Booking not found" }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ApiError" }
+                            }
+                        }
+                    }
                 }
             }
         },

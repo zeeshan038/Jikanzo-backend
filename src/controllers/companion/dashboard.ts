@@ -9,8 +9,8 @@ import prisma from '../../config/db';
  */
 export const getDashboardData = async (req: Request, res: Response): Promise<void> => {
   const userId = (req as any).user.id;
+  
   try {
-    // Fetch the companion profile for te logged in user
     const profile = await prisma.companionProfile.findUnique({
       where: { userId },
     });
