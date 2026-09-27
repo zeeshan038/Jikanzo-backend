@@ -481,8 +481,11 @@ export const requestExtension = async (req: Request, res: Response) => {
       return res.status(403).json({ status: false, msg: "Unauthorized" });
     }
 
-    if (booking.status !== 'ACTIVE' && booking.status !== 'PENDING') {
-      return res.status(400).json({ status: false, msg: "Only active or pending bookings can be extended" });
+    if (!['PENDING', 'ACCEPTED', 'ACTIVE'].includes(booking.status)) {
+      return res.status(400).json({
+        status: false,
+        msg: "Only pending, accepted, or active bookings can be extended",
+      });
     }
 
     if (booking.extensionStatus === 'PENDING') {

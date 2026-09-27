@@ -2897,6 +2897,7 @@
             "post": {
                 "tags": ["Booking"],
                 "summary": "Request booking extension",
+                "description": "Client only. Booking status must be PENDING, ACCEPTED, or ACTIVE. Sets extensionStatus to PENDING; main booking status is unchanged.",
                 "security": [{ "bearerAuth": [] }],
                 "parameters": [
                     { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
