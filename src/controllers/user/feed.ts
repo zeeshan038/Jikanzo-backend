@@ -308,9 +308,18 @@ export const specificCompanion = async (req: Request, res: Response): Promise<an
 
         // Clean up the response
         const { moments, savedBy, ...companionData } = companion;
+        const gallery = companion.user.gallery ?? [];
+        const galleryLayout = companion.user.galleryLayout ?? '1';
 
         const responseData = {
             ...companionData,
+            user: {
+                ...companion.user,
+                gallery,
+                galleryLayout,
+            },
+            gallery,
+            galleryLayout,
             isSaved,
             allMomentsSeen,
             moments: formattedMoments,

@@ -2423,6 +2423,23 @@
                                                     "type": "boolean",
                                                     "description": "Whether the authenticated user saved this companion"
                                                 },
+                                                "gallery": {
+                                                    "type": "array",
+                                                    "description": "Companion profile gallery image URLs",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "format": "uri"
+                                                    }
+                                                },
+                                                "galleryLayout": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "1",
+                                                        "2",
+                                                        "3"
+                                                    ],
+                                                    "description": "Gallery UI template (same as whoami / upload-gallery)"
+                                                },
                                                 "user": {
                                                     "type": "object",
                                                     "properties": {
@@ -2462,8 +2479,17 @@
                                                         "gallery": {
                                                             "type": "array",
                                                             "items": {
-                                                                "type": "string"
+                                                                "type": "string",
+                                                                "format": "uri"
                                                             }
+                                                        },
+                                                        "galleryLayout": {
+                                                            "type": "string",
+                                                            "enum": [
+                                                                "1",
+                                                                "2",
+                                                                "3"
+                                                            ]
                                                         },
                                                         "intros": {
                                                             "type": "array",
@@ -2603,6 +2629,11 @@
                                             "rating": 5,
                                             "trustRank": "New",
                                             "isSaved": false,
+                                            "gallery": [
+                                                "https://cdn.example.com/gallery-1.jpg",
+                                                "https://cdn.example.com/gallery-2.jpg"
+                                            ],
+                                            "galleryLayout": "2",
                                             "allMomentsSeen": false,
                                             "moments": [
                                                 {
@@ -2633,7 +2664,12 @@
                                                 "username": "elena",
                                                 "profileImage": "https://cdn.example.com/avatar.jpg",
                                                 "age": 28,
-                                                "gender": "Female"
+                                                "gender": "Female",
+                                                "gallery": [
+                                                    "https://cdn.example.com/gallery-1.jpg",
+                                                    "https://cdn.example.com/gallery-2.jpg"
+                                                ],
+                                                "galleryLayout": "2"
                                             },
                                             "reviews": []
                                         }
