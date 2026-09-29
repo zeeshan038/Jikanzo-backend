@@ -13,7 +13,8 @@ import {
 } from '../../controllers/user/user';
 import {
     uploadImage,
-    uploadVideo
+    uploadVideo,
+    deleteMedia,
 } from '../../controllers/user/upload';
 import { verifyUser } from '../../middlewares/verifyUser';
 import multer from 'multer';
@@ -34,6 +35,7 @@ router.get('/whoami', whoami);
 router.post('/update-fcm', UpdateFcm);
 router.post('/upload-image', upload.single('image'), uploadImage);
 router.post('/upload-video', upload.single('video'), uploadVideo);
+router.delete('/media', deleteMedia);
 router.post('/upload-gallery', uploadGallery);
 router.get('/check-progress', checkProfileProgress);
 

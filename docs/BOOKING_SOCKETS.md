@@ -1,40 +1,95 @@
-# Booking sockets — simple guide for frontend
+# Booking real-time updates (Socket.io) — easy guide
 
-This file explains **everything** about real-time booking updates using **Socket.io**.
+**Who should read this?**
 
-Read this top to bottom once. Then use the **Event list** section as your cheat sheet while coding.
-
----
-
-## 1. What is this for?
-
-When a **client** books a **companion**:
-
-- The companion should see **“8 new requests”** update live.
-- The **Accept / Deny popup** should open live (without refreshing the app).
-- When someone **accepts**, **declines**, **cancels**, or the request **expires**, both sides should see updates live.
-
-**Important:** The app still **calls normal HTTP APIs** to do actions (book, accept, cancel). Sockets only **tell the app that something changed** and send **data to show on screen**.
-
-Sockets do **not** replace:
-
-- `POST /api/booking/book-companion/:id`
-- `POST /api/booking/accept`
-- `GET /api/booking/detail/:id`
+1. **You (product / owner)** — read **Part A** only. It explains *what* happens in the app without heavy tech words.
+2. **Your mobile developer** — read **Part A** once, then **Part B** while building. Part B has exact event names, JSON fields, and code.
 
 ---
 
-## 2. How to connect (one time after login)
+# Part A — For you (plain English)
 
-Use the **same API base URL** as your REST calls.
+## What problem do sockets solve?
 
-| What | Exact value |
-|------|-------------|
-| URL | Your API host, e.g. `https://transfer.jikanzo.com` or `http://localhost:3000` |
-| Socket path | `/socket.io` |
-| npm package | `socket.io-client` (version 4) |
+When something happens on the server (new booking, accept, extension, etc.), the **other person’s phone should update right away** — without the user pulling to refresh.
 
-Pass the **same login token (JWT)** you use for `Authorization: Bearer ...` on APIs.
+- **Normal API (HTTP)** = the app *asks* the server: “What’s new?”
+- **Socket** = the server *tells* the app: “Something changed — here’s the data.”
+
+**Important:** Buttons still use normal APIs (book, accept, cancel). Sockets only **notify** and **send data to show on screen**. They do not replace those APIs.
+
+---
+
+## Two roles in booking
+
+| Role | Who | What they care about |
+|------|-----|----------------------|
+| **Client** | Person who books the companion | “Was I accepted?” “Can I extend the meeting?” |
+| **Companion** | Person who gets booked | “How many new requests?” “Accept or deny popup” |
+
+Both should connect to the socket **after login** (same login token as APIs). On logout, disconnect.
+
+---
+
+## Booking journey (simple timeline)
+
+1. **Client sends a booking request** → Companion sees a **popup** and banner count goes up.
+2. **Companion accepts or declines** → Client’s waiting screen updates.
+3. **Nobody answers for 30 minutes** → Request **expires**; both sides see that.
+4. **Meeting is accepted and paid** → Before start time, **client** gets reminders to **offer extension** (30 min and 15 min before start) via **push notification + socket**.
+5. **Client asks to extend the meeting** (extra hours) → **Both** see an **extension bottom sheet**; companion accepts or denies.
+6. **Meeting runs and ends** → Status can become **COMPLETED** (server cron); app can refresh from socket `booking:request:updated`.
+
+---
+
+## Extension — three different things (don’t mix them up)
+
+| What | Who sees it | When |
+|------|-------------|------|
+| **Reminder to open extension UI** | **Client only** | **30 min** and **15 min before** meeting start (automatic; push + socket) |
+| **Client actually requested extra hours** | **Client + companion** | After client taps and API `request-extension` succeeds |
+| **Companion accepted or denied extension** | **Client + companion** | After companion taps Accept/Deny on extension |
+
+Reminders do **not** create an extension by themselves. They only **ask the client** to open the extension screen. The client still chooses hours and calls the API.
+
+---
+
+## Push notifications vs sockets
+
+| Channel | When it helps |
+|---------|----------------|
+| **Push (FCM)** | App in background or closed — user taps notification to open the right screen |
+| **Socket** | App is open — update UI instantly (popup, banner, bottom sheet) |
+
+For extension **reminders**, the server sends **both at the same time** (30 min and 15 min before start).
+
+Push data includes things like `bookingId`, `action: SHOW_EXTENSION_SHEET`, and `promptType` (30 or 15 minutes).
+
+---
+
+## What is NOT real-time yet?
+
+These still need **normal API calls** and/or manual refresh:
+
+- Pay with wallet  
+- Start session / verify OTP  
+- Some steps after accept (check backend; use `GET /api/booking/detail/:id` when in doubt)
+
+**OTP is never sent on sockets** — only on the detail API for the client.
+
+---
+
+# Part B — For your developer
+
+## 1. Connect once after login
+
+Use the **same base URL** as REST (e.g. `https://transfer.jikanzo.com` or `http://localhost:3000`).
+
+| Setting | Value |
+|---------|--------|
+| Path | `/socket.io` |
+| Library | `socket.io-client` v4 |
+| Auth | Same JWT as `Authorization: Bearer ...` |
 
 ```javascript
 import { io } from 'socket.io-client';
@@ -42,495 +97,330 @@ import { io } from 'socket.io-client';
 const socket = io('https://YOUR_API_HOST', {
   path: '/socket.io',
   auth: { token: userJwtToken },
+  // If auth fails on your stack, try: query: { token: userJwtToken }
 });
+
+socket.on('connect', () => console.log('Socket connected'));
+socket.on('connect_error', (err) => console.log('Socket failed', err.message));
 ```
 
-If `auth` does not work on your platform, you can use:
+**Common connect errors:** expired token, wrong token, or user logged in on another device (single active token).
 
-```javascript
-query: { token: userJwtToken }
-```
+**Who must connect?**
 
-**When connection works:** you will see a normal `connect` event from the library.
-
-**When connection fails:** you get `connect_error`. Common reasons:
-
-- Wrong or expired token
-- User logged in on another phone (server only allows one active token)
-
-**Who should connect?**
-
-- **Companion** — must connect on home / dashboard (to see new requests).
-- **Client** — should connect when waiting for accept/decline or on booking screens.
-
-After login → connect socket. On logout → disconnect socket.
+- **Companion:** on home / dashboard (new requests).
+- **Client:** on booking wait screen, booking detail, and ideally whenever logged in if you want extension reminders live.
 
 ---
 
-## 3. What the server does automatically (you do not code this)
+## 2. What the server does for you (no extra code)
 
-When you connect, the server puts your socket in rooms:
+On connect, the server joins your socket to:
 
-| Room name (internal) | You get it if… | Why |
-|----------------------|----------------|-----|
-| `user:{yourUserId}` | Always | Client gets updates about their bookings |
-| `companion:{companionProfileId}` | You have a companion profile | New requests + pending count |
+| Room | You get it if… | Purpose |
+|------|----------------|---------|
+| `user:{userId}` | Always | Updates for this user as **client** |
+| `companion:{companionProfileId}` | User has a companion profile | New requests + pending count |
 
-You **do not** need to join these rooms yourself.
+You **do not** manually join these rooms.
+
+Optional: on **booking detail screen**, emit `booking:subscribe` / `booking:unsubscribe` (see events 8–9) to also hear updates for that one booking id.
 
 ---
 
-## 4. Full list of events (quick table)
+## 3. Cheat sheet — all event names
 
-### Messages **from server to app** (you **listen** with `socket.on`)
+### Server → app (`socket.on(...)`)
 
-| # | Exact event name | Mainly for |
-|---|------------------|------------|
-| 1 | `booking:requests:count` | Companion — banner “N new requests” |
-| 2 | `booking:request:new` | Companion — open Accept/Deny popup |
-| 3 | `booking:request:updated` | Client + companion — status changed |
-| 4 | `booking:request:expired` | Client + companion — request timed out |
-| 5 | `booking:extension:requested` | Client + companion — open **extension** bottom sheet |
-| 6 | `booking:extension:updated` | Client + companion — extension accepted/denied; close or refresh sheet |
-| 7 | `booking:extension:prompt` | **Client only** — cron reminder 30 / 15 min before `startTime` (+ matching push) |
+| # | Event name | Main audience | One-line meaning |
+|---|------------|---------------|------------------|
+| 1 | `booking:requests:count` | Companion | Banner number: how many **PENDING** requests |
+| 2 | `booking:request:new` | Companion | New request → open Accept/Deny popup |
+| 3 | `booking:request:updated` | Client + companion | Status changed (accepted, cancelled, completed, etc.) |
+| 4 | `booking:request:expired` | Client + companion | PENDING request timed out after 30 minutes |
+| 5 | `booking:extension:requested` | Client + companion | Client asked for extra hours → extension sheet |
+| 6 | `booking:extension:updated` | Client + companion | Companion accepted/denied extension |
+| 7 | `booking:extension:prompt` | **Client only** | Reminder 30 / 15 min before start → open extension UI |
 
-### Messages **from app to server** (you **send** with `socket.emit`)
+### App → server (`socket.emit(...)`)
 
-| # | Exact event name | When to send |
-|---|------------------|--------------|
-| 8 | `booking:subscribe` | User opened one booking detail screen |
+| # | Event name | When |
+|---|------------|------|
+| 8 | `booking:subscribe` | User opened booking **detail** screen |
 | 9 | `booking:unsubscribe` | User left that screen |
 
-There are **9 booking socket event names** today (7 server → app, 2 app → server).
+**Total: 9 booking-related socket names** (7 listen, 2 emit).
 
 ---
 
-## 5. Event details (exact name + body + plain English)
+## 4. Each event — explained simply
+
+For every event below:
+
+- **Direction:** server → app or app → server  
+- **Listen or emit:** what your code does  
+- **When:** what happened on the server  
+- **Payload:** JSON body (fields you read)  
+- **App action:** what the UI should do  
 
 ---
 
-### Event 1: `booking:requests:count`
+### Event 1 — `booking:requests:count`
 
-**Direction:** Server → your app  
+**Listen:** companion only  
 
-**Who should listen:** **Companion only** (user with companion profile).
+**When:** companion connects; new booking; accept/decline/cancel/expire/reschedule changes pending count  
 
-**When does the server send it?**
-
-- Right after companion connects.
-- After a new booking arrives.
-- After accept, decline, cancel, reschedule, or auto-expire (anything that changes how many **PENDING** requests exist).
-
-**Exact payload (JSON body):**
+**Payload:**
 
 ```json
-{
-  "pendingCount": 8
-}
+{ "pendingCount": 8 }
 ```
 
-**What each field means:**
+| Field | Meaning |
+|-------|---------|
+| `pendingCount` | Count of bookings with status **PENDING** for this companion |
 
-| Field | Type | Meaning |
-|-------|------|---------|
-| `pendingCount` | number | How many booking requests are **PENDING** for this companion right now. Use this for the banner text like “8 New request”. |
-
-**What to do in the app:**
-
-- Update the orange banner number on the companion dashboard.
-- You do **not** need to call the dashboard API every time if the socket is connected (still refresh once on app open / reconnect).
+**App action:** Update dashboard banner (e.g. “8 new requests”). You can still call dashboard API once on app open.
 
 ---
 
-### Event 2: `booking:request:new`
+### Event 2 — `booking:request:new`
 
-**Direction:** Server → your app  
+**Listen:** companion only  
 
-**Who should listen:** **Companion only**.
+**When:** client successfully calls `POST /api/booking/book-companion/:companionProfileId`  
 
-**When does the server send it?**
-
-- Client successfully created a booking: `POST /api/booking/book-companion/:companionProfileId`.
-
-**Exact payload (JSON body):**
+**Payload (short):**
 
 ```json
 {
   "bookingId": 123,
   "pendingCount": 8,
-  "preview": {
-    "id": 123,
-    "status": "PENDING",
-    "date": "2026-07-23T00:00:00.000Z",
-    "startTime": "2026-07-23T00:00:00.000Z",
-    "endTime": "2026-07-23T02:00:00.000Z",
-    "address": "Nwab Restaurant",
-    "activity": "Fine Dining",
-    "paymentStatus": "PENDING",
-    "createdAt": "2026-07-22T12:00:00.000Z",
-    "requestExpiresAt": "2026-07-22T12:30:00.000Z",
-    "client": {
-      "id": 45,
-      "username": "elena_r",
-      "profileImage": "https://example.com/photo.jpg",
-      "age": 28
-    },
-    "paymentSummary": {
-      "durationHours": 1,
-      "durationLabel": "1 Hour",
-      "hourlyRate": 40,
-      "currency": "USD",
-      "paymentStatus": "PENDING",
-      "grossAmount": 40,
-      "platformFee": 4,
-      "companionNetAmount": 36,
-      "platformFeePercent": 10,
-      "expectedCompanionEarnings": 36
-    }
-  }
+  "preview": { ... }
 }
 ```
 
-**Note:** `preview` can be `null` if something went wrong loading data (rare). If null, open popup and load `GET /api/booking/detail/:bookingId`.
+| Field | Meaning |
+|-------|---------|
+| `bookingId` | Use for accept API and detail API |
+| `pendingCount` | Same as event 1 — update banner |
+| `preview` | Full popup data (client name, time, place, money). Can be `null` — then call `GET /api/booking/detail/:id` |
 
-**Top level fields:**
+**Important fields inside `preview`:**
 
-| Field | Type | Meaning |
-|-------|------|---------|
-| `bookingId` | number | Same as booking id. Use for accept API and detail API. |
-| `pendingCount` | number | Same as event 1 — update banner. |
-| `preview` | object or null | All UI data for the popup (see below). |
+| Field | Meaning |
+|-------|---------|
+| `status` | Usually `"PENDING"` |
+| `startTime` / `endTime` | Session times (ISO strings) |
+| `address` / `activity` | Where and what |
+| `requestExpiresAt` | Auto-expire time (**30 min** after `createdAt` while PENDING) — use for countdown |
+| `client` | `username`, `profileImage`, `age`, etc. |
+| `paymentSummary` | Duration, rates, fees, earnings |
 
-**Inside `preview`:**
+**App action:**
 
-| Field | Type | Meaning |
-|-------|------|---------|
-| `id` | number | Booking id |
-| `status` | string | Usually `"PENDING"` for new requests |
-| `date` | string (ISO date) | Booking day |
-| `startTime` | string (ISO datetime) | Session start |
-| `endTime` | string (ISO datetime) | Session end |
-| `address` | string | Location name / address |
-| `activity` | string | e.g. `"Fine Dining"`, `"Coffee"` |
-| `paymentStatus` | string | e.g. `"PENDING"`, `"PAID"` |
-| `createdAt` | string (ISO datetime) | When client sent the request |
-| `requestExpiresAt` | string or null | When the request auto-expires if companion does not answer (**30 minutes** after `createdAt` while still PENDING). Use for countdown timer. |
+1. Open **Booking Request** modal.  
+2. Fill UI from `preview`.  
+3. Countdown from `requestExpiresAt`.  
+4. Accept/Deny → **HTTP** `POST /api/booking/accept` (not socket).
 
-**Inside `preview.client` (person who booked):**
-
-| Field | Type | Meaning |
-|-------|------|---------|
-| `id` | number | Client user id |
-| `username` | string | Show as name on popup |
-| `profileImage` | string or null | Avatar URL |
-| `age` | number or null | Show age if you want “Elena, 28” |
-
-**Inside `preview.paymentSummary` (money / duration on popup):**
-
-| Field | Type | Meaning |
-|-------|------|---------|
-| `durationHours` | number | Length in hours (e.g. `1`) |
-| `durationLabel` | string | Ready text: `"1 Hour"` or `"2 Hours"` |
-| `hourlyRate` | number | Companion rate used for this booking |
-| `currency` | string | Usually `"USD"` |
-| `paymentStatus` | string | Payment state for this booking |
-| `grossAmount` | number | Total before platform fee |
-| `platformFee` | number | App fee amount |
-| `companionNetAmount` | number | What companion earns after fee |
-| `platformFeePercent` | number | Fee % (often `10`) |
-| `expectedCompanionEarnings` | number | Same idea as net — show as “Expected earnings” on popup |
-
-**What to do in the app:**
-
-1. Open the **Booking Request** modal.
-2. Fill all labels from `preview`.
-3. Start countdown from `requestExpiresAt`.
-4. Update banner with `pendingCount`.
-5. **Accept** and **Deny** buttons still call HTTP API (see section 8), not a socket.
-
-**Push notification (separate from socket):**
-
-If app is in background, companion also gets FCM with `bookingId`. When user taps notification, open the same popup and optionally call detail API.
+**Background:** companion may also get FCM with `bookingId`; tap → same popup.
 
 ---
 
-### Event 3: `booking:request:updated`
+### Event 3 — `booking:request:updated`
 
-**Direction:** Server → your app  
+**Listen:** client **and** companion  
 
-**Who should listen:** **Client and companion** (both).
+**When (examples):**
 
-**When does the server send it?**
+| Action | API |
+|--------|-----|
+| Accept / decline | `POST /api/booking/accept` |
+| Cancel | `POST /api/booking/cancel/:id` |
+| Reschedule | `PATCH /api/booking/reschedule/:id` |
+| Auto-complete when meeting end passed | Server cron (no API from app) |
 
-| What happened | HTTP API that triggers it |
-|---------------|---------------------------|
-| Companion accepted or declined | `POST /api/booking/accept` |
-| Someone cancelled | `POST /api/booking/cancel/:id` |
-| Client rescheduled | `PATCH /api/booking/reschedule/:id` |
+**Payload:** Full booking snapshot — includes `bookingId`, `id`, `status`, times, `paymentStatus`, `extensionStatus`, `client`, `companionProfile`, `paymentSummary`, etc.
 
-**Not sent yet** when client pays, starts session, verifies OTP, completes, or extension — only refresh with REST for those until backend adds more events.
+**Status values you will see:** `PENDING`, `ACCEPTED`, `ACTIVE`, `CANCELLED`, `COMPLETED`, …
 
-**Exact payload (JSON body):**
+**Security:** **No OTP** in this event. Client OTP: `GET /api/booking/detail/:id`.
+
+**App action:**
+
+- Companion: close popup if status ≠ `PENDING`; refresh lists.  
+- Client: show accepted / declined / cancelled.  
+- Detail screens: merge payload or refetch detail.  
+- Companion often gets event 1 again with new `pendingCount`.
+
+**Note:** Not every booking action emits this yet. If UI looks stale after pay/OTP/start, refetch detail API.
+
+---
+
+### Event 4 — `booking:request:expired`
+
+**Listen:** client **and** companion  
+
+**When:** booking stayed **PENDING** 30 minutes → server cancels it (cron every minute)  
+
+**Payload:**
+
+```json
+{ "bookingId": 123 }
+```
+
+**App action:** Close companion popup for this id; show “Request expired” for client; banner updates via event 1.
+
+---
+
+### Event 5 — `booking:extension:requested`
+
+**Listen:** client **and** companion  
+
+**When:** client calls:
+
+`POST /api/booking/request-extension/:bookingId`  
+Body: `{ "extensionHours": 2 }` (example)
+
+**Payload:** Extension “sheet” data plus:
 
 ```json
 {
   "bookingId": 123,
-  "id": 123,
-  "status": "ACCEPTED",
-  "date": "2026-07-23T00:00:00.000Z",
-  "startTime": "2026-07-23T00:00:00.000Z",
-  "endTime": "2026-07-23T02:00:00.000Z",
-  "address": "Nwab Restaurant",
-  "activity": "Fine Dining",
-  "paymentStatus": "PENDING",
-  "extensionStatus": "NONE",
-  "cancellationReason": null,
-  "cancellationReasonCode": null,
-  "createdAt": "2026-07-22T12:00:00.000Z",
-  "updatedAt": "2026-07-22T12:05:00.000Z",
-  "requestExpiresAt": null,
-  "client": {
-    "id": 45,
-    "username": "elena_r",
-    "profileImage": "https://example.com/photo.jpg",
-    "age": 28
-  },
-  "companionProfile": {
-    "id": 1,
-    "bio": "Hello",
-    "hourlyRate": 40,
-    "rating": 4.5,
-    "trustRank": "GOLD",
-    "totalSessions": 10,
-    "repeatClients": 3,
-    "jssScore": 80,
-    "completedMeetups": 8,
-    "reliabilityScore": 90,
-    "user": {
-      "id": 12,
-      "username": "companion_name",
-      "profileImage": "https://example.com/c.jpg",
-      "age": 25,
-      "languages": ["English"],
-      "activityType": ["Coffee"],
-      "about": "About text",
-      "gallery": []
-    }
-  },
-  "paymentSummary": {
-    "durationHours": 1,
-    "durationLabel": "1 Hour",
-    "hourlyRate": 40,
-    "currency": "USD",
-    "paymentStatus": "PENDING",
-    "grossAmount": 40,
-    "platformFee": 4,
-    "companionNetAmount": 36,
-    "platformFeePercent": 10,
-    "expectedCompanionEarnings": 36
+  "extensionStatus": "PENDING",
+  "extensionHours": 2,
+  "extensionAmount": 80,
+  "extensionPaymentStatus": "PENDING",
+  "startTime": "...",
+  "endTime": "...",
+  "client": { ... },
+  "companionProfile": { ... },
+  "paymentSummary": { ... },
+  "bottomSheet": {
+    "companion": true,
+    "client": true
   }
 }
 ```
 
-**Field meanings (booking level):**
+| Field | Meaning |
+|-------|---------|
+| `extensionStatus` | `"PENDING"` here |
+| `extensionHours` | Hours client asked for |
+| `extensionAmount` | Price for extension |
+| `bottomSheet.companion` | Show Accept / Deny extension UI |
+| `bottomSheet.client` | Show “waiting for companion” UI |
 
-| Field | Type | Meaning |
-|-------|------|---------|
-| `bookingId` | number | Booking id (duplicate of `id` for convenience) |
-| `id` | number | Booking id |
-| `status` | string | e.g. `PENDING`, `ACCEPTED`, `CANCELLED`, `ACTIVE`, `COMPLETED` |
-| `date` | string | Booking date |
-| `startTime` | string | Start time |
-| `endTime` | string | End time |
-| `address` | string | Location |
-| `activity` | string | Activity type |
-| `paymentStatus` | string | Payment state |
-| `extensionStatus` | string | Extension flow state (often `"NONE"`) |
-| `cancellationReason` | string or null | Human-readable cancel reason if cancelled |
-| `cancellationReasonCode` | string or null | Code if cancelled via cancel API |
-| `createdAt` | string | Created time |
-| `updatedAt` | string | Last update time |
-| `requestExpiresAt` | string or null | Countdown end while `PENDING`; otherwise `null` |
-| `client` | object | Client summary (same fields as in event 2) |
-| `companionProfile` | object | Companion public info + nested `user` |
-| `paymentSummary` | object | Same shape as in event 2 |
+**App action:**
 
-**Security — OTP:**
-
-This event **never** includes `otp`. For client OTP, call:
-
-`GET /api/booking/detail/:id`
-
-**What to do in the app:**
-
-- **Companion:** close popup if status is no longer `PENDING`; refresh lists.
-- **Client:** show “Accepted”, “Declined”, or “Cancelled”.
-- Any open detail screen: update UI from this payload or refetch detail API.
-
-After this event, companion often also gets `booking:requests:count` with a new `pendingCount`.
+- **Companion:** open sheet; Accept/Deny → `POST /api/booking/respond-extension/:id` with `{ "action": "ACCEPT" }` or `"DENY"`.  
+- **Client:** open waiting state (may already be open from API response).
 
 ---
 
-### Event 4: `booking:request:expired`
+### Event 6 — `booking:extension:updated`
 
-**Direction:** Server → your app  
+**Listen:** client **and** companion  
 
-**Who should listen:** **Client and companion**.
+**When:** companion calls `POST /api/booking/respond-extension/:id` with ACCEPT or DENY  
 
-**When does the server send it?**
+**Payload:** Same shape as event 5, but:
 
-- Booking was **PENDING** for **30 minutes** with no accept/decline. Server cancels it automatically (cron job every minute).
+| After action | `extensionStatus` | `bottomSheet` |
+|--------------|-------------------|-----------------|
+| Accept | `"ACCEPTED"` | usually both `false` → **close sheet** |
+| Deny | `"DENIED"` | both `false` → **close sheet** |
+| Still pending (rare here) | `"PENDING"` | both `true` |
 
-**Exact payload (JSON body):**
+On **ACCEPT**, `endTime` may increase. You may also get `booking:request:updated` for lists.
+
+---
+
+### Event 7 — `booking:extension:prompt` (reminder — client only)
+
+**Listen:** **client only** (companion does **not** receive this)
+
+**When:** server **cron** (every minute):
+
+- **30 minutes before** `startTime` — once per booking  
+- **15 minutes before** `startTime` — once per booking  
+
+Only for bookings that are:
+
+- Status **ACCEPTED**  
+- **Paid** (`paymentStatus` PAID)  
+- Meeting **not started yet**  
+- No extension already **PENDING**  
+
+At the same time, server sends **FCM push** to the client.
+
+**Socket payload:**
 
 ```json
 {
-  "bookingId": 123
+  "bookingId": 123,
+  "promptType": "30_MIN_BEFORE_START",
+  "startTime": "...",
+  "endTime": "...",
+  "extensionStatus": "NONE",
+  "client": { ... },
+  "companionProfile": { ... },
+  "paymentSummary": { ... },
+  "bottomSheet": {
+    "client": true,
+    "companion": false
+  }
 }
 ```
 
-| Field | Type | Meaning |
-|-------|------|---------|
-| `bookingId` | number | Which booking expired |
+| `promptType` | Meaning |
+|--------------|---------|
+| `30_MIN_BEFORE_START` | First reminder |
+| `15_MIN_BEFORE_START` | Second reminder |
 
-**What to do in the app:**
+**Push notification (same moment):**
 
-- Close companion Accept/Deny popup if it was showing this id.
-- Show “Request expired” on client waiting screen.
-- Companion banner updates via following `booking:requests:count`.
+| Type | Title (example) |
+|------|-----------------|
+| `EXTENSION_PROMPT_30` | Meeting starts in 30 minutes |
+| `EXTENSION_PROMPT_15` | Meeting starts in 15 minutes |
 
----
+Push **data** (strings): `bookingId`, `promptType`, `action` = `SHOW_EXTENSION_SHEET`
 
-### Event 5: `booking:extension:requested`
+**App action:**
 
-**Direction:** Server → your app  
-
-**Who should listen:** **Client and companion** (both).
-
-**When does the server send it?**
-
-- Client calls `POST /api/booking/request-extension/:bookingId` with `{ "extensionHours": N }`.
-
-**Exact payload (JSON body):**
-
-Same shape as `booking:extension:updated` (see event 6). Key fields:
-
-| Field | Meaning |
-|-------|---------|
-| `bookingId` | Booking id |
-| `extensionStatus` | `"PENDING"` when this event fires |
-| `extensionHours` | Hours client requested |
-| `extensionAmount` | Price for the extension |
-| `extensionPaymentStatus` | Extension payment state |
-| `endTime` | Current end time (before accept extends it) |
-| `client`, `companionProfile`, `paymentSummary` | UI for bottom sheet |
-| `bottomSheet.companion` | `true` — show Accept/Deny extension UI |
-| `bottomSheet.client` | `true` — show “waiting for companion” extension UI |
-
-**What to do in the app:**
-
-- **Companion:** open extension bottom sheet; buttons call `POST /api/booking/respond-extension/:id` with `ACCEPT` / `DENY`.
-- **Client:** open extension bottom sheet in waiting state (optional if already on that screen from REST response).
-
----
-
-### Event 6: `booking:extension:updated`
-
-**Direction:** Server → your app  
-
-**Who should listen:** **Client and companion**.
-
-**When does the server send it?**
-
-- Companion calls `POST /api/booking/respond-extension/:id` with `{ "action": "ACCEPT" }` or `"DENY"`.
-
-**Payload:** Same fields as event 5. After accept/deny:
-
-- `extensionStatus` is `"ACCEPTED"` or `"DENIED"`
-- `endTime` updated on **ACCEPT**
-- `bottomSheet.companion` / `bottomSheet.client` are `false` when no longer pending — **close** the sheet
-
-You may also receive `booking:request:updated` on the same action (for booking lists).
-
----
-
-### Event 7: `booking:extension:prompt`
-
-**Direction:** Server → your app  
-
-**Who should listen:** **Client only** (companion does not receive this).
-
-**When does the server send it?**
-
-- Cron (every minute): **30 minutes** and **15 minutes** before `startTime` for paid, **ACCEPTED** bookings.
-- Same moment as FCM push (`EXTENSION_PROMPT_30` / `EXTENSION_PROMPT_15`).
-
-**Payload:** Same booking/extension sheet fields as event 5, plus:
-
-| Field | Meaning |
-|-------|---------|
-| `promptType` | `"30_MIN_BEFORE_START"` or `"15_MIN_BEFORE_START"` |
-| `bottomSheet.client` | `true` — show extension request UI |
-| `bottomSheet.companion` | `false` |
-
-**What to do in the app:**
-
-- Open extension bottom sheet (client chooses hours → `POST /api/booking/request-extension/:id`).
-- On push tap, read `data.bookingId` and `data.action === 'SHOW_EXTENSION_SHEET'`.
+1. If app open: `socket.on('booking:extension:prompt', ...)` → open **extension bottom sheet** for client (pick hours → call `request-extension` API).  
+2. If user taps push: read `bookingId` + `SHOW_EXTENSION_SHEET` → navigate and open same sheet.  
+3. This event does **not** mean extension was already requested — only **invite** the client to request.
 
 ```javascript
 socket.on('booking:extension:prompt', (body) => {
-  // body.promptType, body.bookingId, body.bottomSheet.client === true
+  if (!body.bottomSheet?.client) return;
+  openExtensionSheetForClient(body.bookingId, body);
 });
 ```
 
 ---
 
-### Event 8: `booking:subscribe` (app → server)
+### Event 8 — `booking:subscribe` (app → server)
 
-**Direction:** Your app → server  
-
-**Who sends:** Client or companion, when they open **one booking detail** page.
-
-**Exact payload you must send:**
-
-```json
-{
-  "bookingId": 123
-}
-```
-
-| Field | Type | Required | Meaning |
-|-------|------|----------|---------|
-| `bookingId` | number | yes | Booking you are viewing |
-
-**Code:**
+**Emit when:** user opens **one booking detail** page  
 
 ```javascript
 socket.emit('booking:subscribe', { bookingId: 123 });
 ```
 
-Server checks you are the client or companion on that booking. If yes, you also receive updates in the `booking:{id}` room (helps for detail screen).
+Server checks you are the client or companion on that booking, then adds you to room `booking:123` for extra updates on that screen.
 
-**You do not need this** just to show the popup from event 2 — `preview` is enough. Use subscribe when user stays on a detail route.
+**You do not need this** for the companion popup from event 2 — `preview` is enough.
 
 ---
 
-### Event 9: `booking:unsubscribe` (app → server)
+### Event 9 — `booking:unsubscribe` (app → server)
 
-**Direction:** Your app → server  
-
-**When:** User leaves the booking detail screen.
-
-**Exact payload:**
-
-```json
-{
-  "bookingId": 123
-}
-```
-
-**Code:**
+**Emit when:** user leaves booking detail  
 
 ```javascript
 socket.emit('booking:unsubscribe', { bookingId: 123 });
@@ -538,70 +428,96 @@ socket.emit('booking:unsubscribe', { bookingId: 123 });
 
 ---
 
-## 6. Simple story (companion + client)
+## 5. Story — step by step (client + companion)
 
-**Step A — Client books**
+**A — Client books**
 
-1. Client app: `POST /api/booking/book-companion/:companionProfileId`
-2. Companion app (if socket connected): receives `booking:request:new` → **open popup**
-3. Companion app: also receives `booking:requests:count` → **update banner**
-4. Companion app (if in background): push notification with `bookingId`
+1. Client: `POST /api/booking/book-companion/:companionProfileId`  
+2. Companion socket: `booking:request:new` → open popup  
+3. Companion socket: `booking:requests:count` → update banner  
+4. Background: FCM to companion with `bookingId`  
 
-**Step B — Companion accepts**
+**B — Companion accepts**
 
-1. Companion app: `POST /api/booking/accept` with `{ "bookingId": 123, "action": "ACCEPT" }`
-2. Both apps: receive `booking:request:updated` with `"status": "ACCEPTED"`
-3. Companion: `booking:requests:count` goes down
+1. Companion: `POST /api/booking/accept` `{ bookingId, action: "ACCEPT" }`  
+2. Both: `booking:request:updated` with `status: "ACCEPTED"`  
+3. Companion: `pendingCount` may drop (event 1)  
 
-**Step C — Companion declines**
+**C — Companion declines**
 
-1. Same API with `"action": "DECLINE"`
-2. Status becomes `CANCELLED` in `booking:request:updated`
+1. Same API with `action: "DECLINE"`  
+2. Both: `booking:request:updated` (often `CANCELLED`)  
 
-**Step D — Nobody answers for 30 minutes**
+**D — 30 minutes, no answer**
 
-1. Both apps: `booking:request:expired` with `{ "bookingId": 123 }`
+1. Both: `booking:request:expired`  
+2. Companion: new count via event 1  
 
-**Step E — Client requests extension**
+**E — Automatic extension reminders (client)**
 
-1. Client: `POST /api/booking/request-extension/123` with `{ "extensionHours": 2 }`
-2. Both apps: `booking:extension:requested` → open extension bottom sheet
-3. Companion: `POST /api/booking/respond-extension/123` with `{ "action": "ACCEPT" }`
-4. Both apps: `booking:extension:updated` → close sheet / show new end time
+1. **30 min before start:** push + `booking:extension:prompt` (`30_MIN_BEFORE_START`)  
+2. **15 min before start:** push + `booking:extension:prompt` (`15_MIN_BEFORE_START`)  
+3. Client opens sheet and optionally calls `POST /api/booking/request-extension/:id`  
+
+**F — Client requests extension**
+
+1. Client: `POST /api/booking/request-extension/123` `{ "extensionHours": 2 }`  
+2. Both: `booking:extension:requested`  
+3. Companion: `POST /api/booking/respond-extension/123` `{ "action": "ACCEPT" }`  
+4. Both: `booking:extension:updated` → close sheet or show new end time  
 
 ---
 
-## 7. Copy-paste listener example
+## 6. Copy-paste — all listeners
 
 ```javascript
+// Companion — dashboard
 socket.on('booking:requests:count', (body) => {
-  // body.pendingCount
+  setPendingCount(body.pendingCount);
 });
 
 socket.on('booking:request:new', (body) => {
-  // body.bookingId, body.pendingCount, body.preview
+  setPendingCount(body.pendingCount);
+  if (body.preview) openRequestPopup(body.preview);
+  else openRequestPopupAndLoadDetail(body.bookingId);
 });
 
+// Client + companion — booking state
 socket.on('booking:request:updated', (body) => {
-  // body.status, body.bookingId, full booking fields
+  updateBookingInState(body.bookingId, body);
+  if (body.status !== 'PENDING') closeRequestPopupIfOpen(body.bookingId);
 });
 
 socket.on('booking:request:expired', (body) => {
-  // body.bookingId
+  closeRequestPopupIfOpen(body.bookingId);
+  showExpiredMessage(body.bookingId);
 });
 
+// Extension — after client calls request-extension API
 socket.on('booking:extension:requested', (body) => {
-  // body.extensionHours, body.extensionAmount, body.bottomSheet
+  if (body.bottomSheet?.companion) openExtensionSheetCompanion(body);
+  if (body.bottomSheet?.client) openExtensionSheetClientWaiting(body);
 });
 
 socket.on('booking:extension:updated', (body) => {
-  // body.extensionStatus ACCEPTED | DENIED — close bottom sheet if not PENDING
+  if (!body.bottomSheet?.companion && !body.bottomSheet?.client) {
+    closeExtensionSheet();
+  } else {
+    refreshExtensionSheet(body);
+  }
+});
+
+// Extension — cron reminders (CLIENT ONLY)
+socket.on('booking:extension:prompt', (body) => {
+  if (body.bottomSheet?.client) {
+    openExtensionSheetClientOffer(body); // user still picks hours + API
+  }
 });
 ```
 
 ---
 
-## 8. HTTP APIs you still must call (buttons)
+## 7. HTTP APIs (buttons — not sockets)
 
 ### Client creates booking
 
@@ -610,13 +526,15 @@ POST /api/booking/book-companion/{companionProfileId}
 Authorization: Bearer {clientToken}
 ```
 
-Body example:
+`companionProfileId` = **CompanionProfile.id**, not User.id.
+
+Example body:
 
 ```json
 {
   "date": "2026-07-23T00:00:00.000Z",
-  "startTime": "2026-07-23T00:00:00.000Z",
-  "endTime": "2026-07-23T02:00:00.000Z",
+  "startTime": "2026-07-23T18:00:00.000Z",
+  "endTime": "2026-07-23T20:00:00.000Z",
   "latitude": 0,
   "longitude": 0,
   "address": "Nwab Restaurant",
@@ -624,97 +542,110 @@ Body example:
 }
 ```
 
-`companionProfileId` is the id from **CompanionProfile**, not the user id.
-
-### Companion Accept button
+### Companion accept / deny
 
 ```
 POST /api/booking/accept
-Authorization: Bearer {companionToken}
 ```
-
-Body:
 
 ```json
-{
-  "bookingId": 123,
-  "action": "ACCEPT"
-}
+{ "bookingId": 123, "action": "ACCEPT" }
 ```
-
-### Companion Deny button
-
-Same URL, body:
 
 ```json
-{
-  "bookingId": 123,
-  "action": "DECLINE"
-}
+{ "bookingId": 123, "action": "DECLINE" }
 ```
 
-### Load full detail (OTP, extra fields)
+### Client request extension
 
 ```
-GET /api/booking/detail/123
-Authorization: Bearer {token}
+POST /api/booking/request-extension/{bookingId}
+```
+
+```json
+{ "extensionHours": 2 }
+```
+
+### Companion respond to extension
+
+```
+POST /api/booking/respond-extension/{bookingId}
+```
+
+```json
+{ "action": "ACCEPT" }
+```
+
+```json
+{ "action": "DENY" }
+```
+
+### Full detail (OTP, extra fields)
+
+```
+GET /api/booking/detail/{bookingId}
 ```
 
 ---
 
-## 9. Timer on popup (Acceptance 14:59 vs server)
+## 8. Popup countdown timer
 
-Server expiry is **30 minutes** from when the booking was created (`createdAt`), while status is **PENDING**.
+While status is **PENDING**, the request expires **30 minutes** after it was created.
 
-Use field **`requestExpiresAt`** from socket or detail API for the countdown.
-
-If design shows 15 minutes, ask product/backend to align — today backend uses **30 minutes**.
+Use **`requestExpiresAt`** from socket `preview` or detail API — not a hard-coded 15 minutes unless product changes the rule.
 
 ---
 
-## 10. What is NOT on sockets yet
+## 9. Auto-complete meetings
 
-Do not wait for socket events for:
+When an **ACTIVE** booking’s `endTime` is in the past, server cron sets status to **COMPLETED** and emits `booking:request:updated`.
 
-- Pay with wallet
-- Start session
-- Verify OTP
-- Chat, feed, notification list
-
-**Auto-complete:** ACTIVE bookings move to `COMPLETED` when `endTime` passes (cron every minute). Listen for `booking:request:updated` with `status: "COMPLETED"`. There is no `POST /api/booking/complete` endpoint.
-
-Use REST + pull to refresh for those screens.
+There is **no** `POST /api/booking/complete` from the app.
 
 ---
 
-## 11. Test without mobile app
-
-In backend repo:
+## 10. Test from backend repo (optional)
 
 ```bash
 # Terminal 1 — companion listens
-COMPANION_TOKEN="paste_jwt_here" npm run test:sockets -- listen
+COMPANION_TOKEN="paste_jwt" npm run test:sockets -- listen
 
-# Terminal 2 — client creates booking
-CLIENT_TOKEN="paste_jwt_here" npm run test:sockets -- book --companion-id=1
+# Terminal 2 — client books
+CLIENT_TOKEN="paste_jwt" npm run test:sockets -- book --companion-id=1
 
 # Terminal 2 — accept
-COMPANION_TOKEN="paste_jwt_here" npm run test:sockets -- accept --booking-id=1 --action=ACCEPT
+COMPANION_TOKEN="paste_jwt" npm run test:sockets -- accept --booking-id=1 --action=ACCEPT
 ```
 
-Get JWT from `POST /api/user/login` after OTP.
+JWT from `POST /api/user/login` after OTP.
 
 ---
 
-## 12. Checklist for frontend developer
+## 11. Developer checklist
 
-- [ ] Connect socket after login with same JWT as APIs
-- [ ] Companion: listen to `booking:requests:count` and `booking:request:new`
-- [ ] Companion popup: data from `preview`; buttons call `POST /api/booking/accept`
-- [ ] Client: listen to `booking:request:updated` and `booking:request:expired` on waiting screen
-- [ ] Both: listen to `booking:extension:requested` and `booking:extension:updated` for extension bottom sheet
-- [ ] Detail screen: emit `booking:subscribe` / `booking:unsubscribe`
-- [ ] Do not expect OTP in any socket payload
-- [ ] On reconnect: call dashboard or booking list API once, then keep using sockets
+- [ ] Connect socket after login (same JWT as APIs); disconnect on logout  
+- [ ] **Companion:** listen `booking:requests:count`, `booking:request:new`  
+- [ ] **Companion popup:** data from `preview`; buttons → `POST /api/booking/accept`  
+- [ ] **Client:** listen `booking:request:updated`, `booking:request:expired` on wait screen  
+- [ ] **Client:** listen `booking:extension:prompt` for 30 / 15 min reminders (+ handle FCM tap)  
+- [ ] **Both:** listen `booking:extension:requested`, `booking:extension:updated`  
+- [ ] Detail screen: `booking:subscribe` / `booking:unsubscribe`  
+- [ ] Never expect OTP on any socket event  
+- [ ] On reconnect: refresh booking list or dashboard once, then keep using sockets  
 
-If something is unclear, ask backend — **only use the event names listed in section 4**.
+---
+
+## 12. Glossary
+
+| Word | Meaning |
+|------|---------|
+| **PENDING** | Companion has not accepted the booking yet |
+| **ACCEPTED** | Companion said yes; client may pay / prepare for meeting |
+| **ACTIVE** | Meeting in progress (after start flow on API) |
+| **COMPLETED** | Meeting finished |
+| **Extension** | Client wants more hours added to the same booking |
+| **bottomSheet** | Flags telling which side should show the extension UI |
+| **promptType** | Which automatic reminder fired (30 or 15 min before start) |
+| **FCM** | Firebase push notification |
+
+If anything does not match the app, compare with **section 3 event names** and ask backend — use only those exact names.

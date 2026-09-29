@@ -49,3 +49,10 @@ export function normalizeGalleryLayout(value: string | number): '1' | '2' | '3' 
   if (s === '1' || s === '2' || s === '3') return s;
   throw new Error('galleryLayout must be 1, 2, or 3');
 }
+
+export const DeleteMediaSchema = Joi.object({
+  url: Joi.string().uri().required(),
+  scope: Joi.string()
+    .valid('auto', 'gallery', 'profile', 'intro')
+    .default('auto'),
+});

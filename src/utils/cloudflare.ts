@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import crypto from 'crypto';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import prisma from '../config/db';
 
 dotenv.config();
@@ -43,6 +43,39 @@ export const uploadToCloudflare = async (fileBuffer: Buffer, mimetype: string, o
         throw new Error(error.message);
     }
 };
+
+export function getCloudflarePublicBaseUrl(): string {
+    const publicUrl = process.env.CLOUDFLARE_PUBLIC_URL || '';
+    return publicUrl.endsWith('/') ? publicUrl : `${publicUrl}/`;
+}
+
+/** Object key from a URL returned by uploadToCloudflare (bucket root keys). */
+export function publicUrlToObjectKey(url: string): string | null {
+    const trimmed = url.trim();
+    const base = getCloudflarePublicBaseUrl();
+    if (!base || base === '/') return null;
+    if (!trimmed.startsWith(base)) {
+        const baseNoSlash = base.replace(/\/$/, '');
+        if (!trimmed.startsWith(baseNoSlash + '/')) return null;
+    }
+    const key = trimmed.replace(base, '').replace(/^\/+/, '');
+    if (!key || key.includes('..')) return null;
+    return key;
+}
+
+export async function deleteFromCloudflare(publicFileUrl: string): Promise<void> {
+    const key = publicUrlToObjectKey(publicFileUrl);
+    if (!key) {
+        throw new Error('URL is not a valid Cloudflare public asset');
+    }
+    const bucketName = process.env.CLOUDFLARE_BUCKET_NAME || '';
+    await s3.send(
+        new DeleteObjectCommand({
+            Bucket: bucketName,
+            Key: key,
+        })
+    );
+}
 
 /**
  * Generate a unique 12-character ID for a user's Cloudflare folder.
