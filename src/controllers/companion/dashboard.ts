@@ -136,6 +136,42 @@ export const getDashboardData = async (req: Request, res: Response): Promise<voi
       repeatRate = Math.round((profile.repeatClients / profile.totalSessions) * 100);
     }
 
+    const now = new Date();
+
+    // 7. Moments: posted stories + appreciation totals (likes, rings, diamonds, views)
+    const [momentTotals, activeMomentsCount, totalMomentViews, activeMoments] = await Promise.all([
+      prisma.moment.aggregate({
+        where: { companionId: profile.id },
+        _sum: { likes: true, diamonds: true, rings: true },
+        _count: { id: true },
+      }),
+      prisma.moment.count({
+        where: { companionId: profile.id, expiresAt: { gt: now } },
+      }),
+      prisma.momentView.count({
+        where: { moment: { companionId: profile.id } },
+      }),
+      prisma.moment.findMany({
+        where: { companionId: profile.id, expiresAt: { gt: now } },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          mediaUrl: true,
+          caption: true,
+          likes: true,
+          diamonds: true,
+          rings: true,
+          createdAt: true,
+          expiresAt: true,
+          _count: { select: { views: true } },
+        },
+      }),
+    ]);
+
+    const totalLikes = momentTotals._sum.likes ?? 0;
+    const totalRings = momentTotals._sum.rings ?? 0;
+    const totalDiamonds = momentTotals._sum.diamonds ?? 0;
+
     res.status(200).json({
       status: true,
       data: {
@@ -157,6 +193,36 @@ export const getDashboardData = async (req: Request, res: Response): Promise<voi
           totalSessions: profile.totalSessions,
           repeatClients: profile.repeatClients,
           repeatRate: repeatRate,
+        },
+        momentsAnalytics: {
+          totalViews: totalMomentViews,
+          totalLikes,
+          totalRings,
+          totalDiamonds,
+        },
+        moments: {
+          posted: {
+            total: momentTotals._count.id,
+            active: activeMomentsCount,
+            list: activeMoments.map((m) => ({
+              id: m.id,
+              mediaUrl: m.mediaUrl,
+              caption: m.caption,
+              likes: m.likes,
+              rings: m.rings,
+              diamonds: m.diamonds,
+              viewCount: m._count.views,
+              createdAt: m.createdAt,
+              expiresAt: m.expiresAt,
+            })),
+          },
+          appreciations: {
+            views: totalMomentViews,
+            likes: totalLikes,
+            rings: totalRings,
+            diamonds: totalDiamonds,
+            total: totalLikes + totalRings + totalDiamonds,
+          },
         },
         reviews: reviews,
       },

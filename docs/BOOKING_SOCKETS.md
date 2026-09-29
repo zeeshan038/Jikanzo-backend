@@ -90,15 +90,17 @@ You **do not** need to join these rooms yourself.
 | 2 | `booking:request:new` | Companion — open Accept/Deny popup |
 | 3 | `booking:request:updated` | Client + companion — status changed |
 | 4 | `booking:request:expired` | Client + companion — request timed out |
+| 5 | `booking:extension:requested` | Client + companion — open **extension** bottom sheet |
+| 6 | `booking:extension:updated` | Client + companion — extension accepted/denied; close or refresh sheet |
 
 ### Messages **from app to server** (you **send** with `socket.emit`)
 
 | # | Exact event name | When to send |
 |---|------------------|--------------|
-| 5 | `booking:subscribe` | User opened one booking detail screen |
-| 6 | `booking:unsubscribe` | User left that screen |
+| 7 | `booking:subscribe` | User opened one booking detail screen |
+| 8 | `booking:unsubscribe` | User left that screen |
 
-There are **only these 6 event names** for booking today. No other booking socket events exist yet.
+There are **8 booking socket event names** today (6 server → app, 2 app → server).
 
 ---
 
@@ -398,7 +400,60 @@ After this event, companion often also gets `booking:requests:count` with a new 
 
 ---
 
-### Event 5: `booking:subscribe` (app → server)
+### Event 5: `booking:extension:requested`
+
+**Direction:** Server → your app  
+
+**Who should listen:** **Client and companion** (both).
+
+**When does the server send it?**
+
+- Client calls `POST /api/booking/request-extension/:bookingId` with `{ "extensionHours": N }`.
+
+**Exact payload (JSON body):**
+
+Same shape as `booking:extension:updated` (see event 6). Key fields:
+
+| Field | Meaning |
+|-------|---------|
+| `bookingId` | Booking id |
+| `extensionStatus` | `"PENDING"` when this event fires |
+| `extensionHours` | Hours client requested |
+| `extensionAmount` | Price for the extension |
+| `extensionPaymentStatus` | Extension payment state |
+| `endTime` | Current end time (before accept extends it) |
+| `client`, `companionProfile`, `paymentSummary` | UI for bottom sheet |
+| `bottomSheet.companion` | `true` — show Accept/Deny extension UI |
+| `bottomSheet.client` | `true` — show “waiting for companion” extension UI |
+
+**What to do in the app:**
+
+- **Companion:** open extension bottom sheet; buttons call `POST /api/booking/respond-extension/:id` with `ACCEPT` / `DENY`.
+- **Client:** open extension bottom sheet in waiting state (optional if already on that screen from REST response).
+
+---
+
+### Event 6: `booking:extension:updated`
+
+**Direction:** Server → your app  
+
+**Who should listen:** **Client and companion**.
+
+**When does the server send it?**
+
+- Companion calls `POST /api/booking/respond-extension/:id` with `{ "action": "ACCEPT" }` or `"DENY"`.
+
+**Payload:** Same fields as event 5. After accept/deny:
+
+- `extensionStatus` is `"ACCEPTED"` or `"DENIED"`
+- `endTime` updated on **ACCEPT**
+- `bottomSheet.companion` / `bottomSheet.client` are `false` when no longer pending — **close** the sheet
+
+You may also receive `booking:request:updated` on the same action (for booking lists).
+
+---
+
+### Event 7: `booking:subscribe` (app → server)
 
 **Direction:** Your app → server  
 
@@ -428,7 +483,7 @@ Server checks you are the client or companion on that booking. If yes, you also 
 
 ---
 
-### Event 6: `booking:unsubscribe` (app → server)
+### Event 8: `booking:unsubscribe` (app → server)
 
 **Direction:** Your app → server  
 
@@ -474,6 +529,13 @@ socket.emit('booking:unsubscribe', { bookingId: 123 });
 
 1. Both apps: `booking:request:expired` with `{ "bookingId": 123 }`
 
+**Step E — Client requests extension**
+
+1. Client: `POST /api/booking/request-extension/123` with `{ "extensionHours": 2 }`
+2. Both apps: `booking:extension:requested` → open extension bottom sheet
+3. Companion: `POST /api/booking/respond-extension/123` with `{ "action": "ACCEPT" }`
+4. Both apps: `booking:extension:updated` → close sheet / show new end time
+
 ---
 
 ## 7. Copy-paste listener example
@@ -493,6 +555,14 @@ socket.on('booking:request:updated', (body) => {
 
 socket.on('booking:request:expired', (body) => {
   // body.bookingId
+});
+
+socket.on('booking:extension:requested', (body) => {
+  // body.extensionHours, body.extensionAmount, body.bottomSheet
+});
+
+socket.on('booking:extension:updated', (body) => {
+  // body.extensionStatus ACCEPTED | DENIED — close bottom sheet if not PENDING
 });
 ```
 
@@ -576,9 +646,9 @@ Do not wait for socket events for:
 - Pay with wallet
 - Start session
 - Verify OTP
-- Complete booking
-- Extension request/response
 - Chat, feed, notification list
+
+**Auto-complete:** ACTIVE bookings move to `COMPLETED` when `endTime` passes (cron every minute). Listen for `booking:request:updated` with `status: "COMPLETED"`. There is no `POST /api/booking/complete` endpoint.
 
 Use REST + pull to refresh for those screens.
 
@@ -609,8 +679,9 @@ Get JWT from `POST /api/user/login` after OTP.
 - [ ] Companion: listen to `booking:requests:count` and `booking:request:new`
 - [ ] Companion popup: data from `preview`; buttons call `POST /api/booking/accept`
 - [ ] Client: listen to `booking:request:updated` and `booking:request:expired` on waiting screen
+- [ ] Both: listen to `booking:extension:requested` and `booking:extension:updated` for extension bottom sheet
 - [ ] Detail screen: emit `booking:subscribe` / `booking:unsubscribe`
 - [ ] Do not expect OTP in any socket payload
 - [ ] On reconnect: call dashboard or booking list API once, then keep using sockets
 
-If something is unclear, ask backend — **only use the 6 event names listed in section 4**.
+If something is unclear, ask backend — **only use the event names listed in section 4**.

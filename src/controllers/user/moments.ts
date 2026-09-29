@@ -310,27 +310,39 @@ export const getCompanionMoments = async (req: Request, res: Response): Promise<
             return res.status(404).json({ status: false, msg: "Companion profile not found" });
         }
 
-        const total = await prisma.moment.count({ where: { companionId: companionProfile.id } });
+        const [total, momentTotals, totalMomentViews, moments] = await Promise.all([
+            prisma.moment.count({ where: { companionId: companionProfile.id } }),
+            prisma.moment.aggregate({
+                where: { companionId: companionProfile.id },
+                _sum: { likes: true, diamonds: true, rings: true },
+            }),
+            prisma.momentView.count({
+                where: { moment: { companionId: companionProfile.id } },
+            }),
+            prisma.moment.findMany({
+                where: { companionId: companionProfile.id },
+                select: {
+                    id: true,
+                    mediaUrl: true,
+                    caption: true,
+                    likes: true,
+                    diamonds: true,
+                    rings: true,
+                    createdAt: true,
+                    expiresAt: true,
+                    _count: {
+                        select: { views: true },
+                    },
+                },
+                orderBy: { createdAt: 'desc' },
+                take: limit,
+                skip: skip,
+            }),
+        ]);
 
-        const moments = await prisma.moment.findMany({
-            where: { companionId: companionProfile.id },
-            select: {
-                id: true,
-                mediaUrl: true,
-                caption: true,
-                likes: true,
-                diamonds: true,
-                rings: true,
-                createdAt: true,
-                expiresAt: true,
-                _count: {
-                    select: { views: true }
-                }
-            },
-            orderBy: { createdAt: 'desc' },
-            take: limit,
-            skip: skip
-        });
+        const totalLikes = momentTotals._sum.likes ?? 0;
+        const totalRings = momentTotals._sum.rings ?? 0;
+        const totalDiamonds = momentTotals._sum.diamonds ?? 0;
 
         // Format to move _count.views to a flat viewCount property for convenience
         const formatted = moments.map(m => ({
@@ -349,7 +361,147 @@ export const getCompanionMoments = async (req: Request, res: Response): Promise<
             status: true, 
             msg: "Moments fetched successfully", 
             data: formatted,
+            momentsAnalytics: {
+                totalViews: totalMomentViews,
+                totalLikes,
+                totalRings,
+                totalDiamonds,
+            },
             pagination: { total, page, limit, totalPages: Math.ceil(total / limit) }
+        });
+    } catch (error: any) {
+        return res.status(500).json({ status: false, msg: error.message });
+    }
+};
+
+
+/**
+ * @Description Top 3 companions with active moments (feed header avatar stack)
+ * @Route GET /api/moments/feed/top
+ * @Access Private
+ */
+export const getFeedTopMoments = async (req: Request, res: Response): Promise<any> => {
+    const userId = (req as any).user.id;
+    const { type, lat, lng, radius } = req.query;
+
+    try {
+        const now = new Date();
+        let companionIdsToFetch: number[] | null = null;
+        const userLat = Number(lat);
+        const userLng = Number(lng);
+        const searchRadius = Number(radius) || 50;
+
+        if (type !== 'nearby') {
+            const savedCompanions = await prisma.savedCompanion.findMany({
+                where: { userId: Number(userId) },
+                select: { companionId: true },
+            });
+            companionIdsToFetch = savedCompanions.map((sc) => sc.companionId);
+
+            if (companionIdsToFetch.length === 0) {
+                return res.status(200).json({ status: true, data: [] });
+            }
+        }
+
+        const whereClause: any = {
+            expiresAt: { gt: now },
+        };
+
+        if (companionIdsToFetch !== null) {
+            whereClause.companionId = { in: companionIdsToFetch };
+        }
+
+        let moments = await prisma.moment.findMany({
+            where: whereClause,
+            include: {
+                views: {
+                    where: { userId: Number(userId) },
+                    select: { id: true },
+                },
+                companion: {
+                    include: {
+                        user: {
+                            select: {
+                                username: true,
+                                profileImage: true,
+                            },
+                        },
+                    },
+                },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        if (type === 'nearby' && lat && lng) {
+            moments = moments.filter((m) => {
+                const cLat = m.companion.locationLat;
+                const cLng = m.companion.locationLng;
+                if (cLat == null || cLng == null) return false;
+                return calculateDistance(userLat, userLng, cLat, cLng) <= searchRadius;
+            });
+        }
+
+        const groupedMap = new Map<number, any>();
+
+        for (const m of moments) {
+            const compId = m.companionId;
+            if (!groupedMap.has(compId)) {
+                groupedMap.set(compId, {
+                    companionId: compId,
+                    username: m.companion.user.username,
+                    profileImage: m.companion.user.profileImage,
+                    allSeen: true,
+                    moments: [] as { momentId: number; mediaUrl: string; createdAt: Date; isSeen: boolean }[],
+                });
+            }
+
+            const compData = groupedMap.get(compId);
+            const isSeen = m.views.length > 0;
+            if (!isSeen) {
+                compData.allSeen = false;
+            }
+
+            compData.moments.push({
+                momentId: m.id,
+                mediaUrl: m.mediaUrl,
+                createdAt: m.createdAt,
+                isSeen,
+            });
+        }
+
+        const topThree = Array.from(groupedMap.values())
+            .sort((a, b) => {
+                if (a.allSeen !== b.allSeen) {
+                    return a.allSeen ? 1 : -1;
+                }
+                const aTime = a.moments[0]?.createdAt?.getTime() ?? 0;
+                const bTime = b.moments[0]?.createdAt?.getTime() ?? 0;
+                return bTime - aTime;
+            })
+            .slice(0, 3)
+            .map((row) => {
+                const latest = row.moments[0];
+                return {
+                    companionId: row.companionId,
+                    username: row.username,
+                    profileImage: row.profileImage,
+                    hasUnseen: !row.allSeen,
+                    momentCount: row.moments.length,
+                    latestMoment: latest
+                        ? {
+                              momentId: latest.momentId,
+                              mediaUrl: latest.mediaUrl,
+                              createdAt: latest.createdAt,
+                              isSeen: latest.isSeen,
+                          }
+                        : null,
+                };
+            });
+
+        return res.status(200).json({
+            status: true,
+            msg: 'Top moments fetched successfully',
+            data: topThree,
         });
     } catch (error: any) {
         return res.status(500).json({ status: false, msg: error.message });

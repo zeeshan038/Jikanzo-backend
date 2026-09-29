@@ -3,7 +3,6 @@ import {
   bookCompanion, 
   acceptBookingController, 
   payWithWallet, 
-  completeBookingController, 
   getClientBookings, 
   getCompanionBookings,
   requestExtension,
@@ -28,7 +27,6 @@ router.get('/detail/:id', getBookingById);
 router.get('/receipt/:id', getBookingReceipt);
 router.post('/book-companion/:id', bookCompanion);
 router.post('/accept', acceptBookingController);
-router.post('/complete', completeBookingController);
 router.post('/pay-with-wallet', payWithWallet);
 router.post('/cancel/:id', cancelBookingController);
 router.patch('/reschedule/:id', rescheduleBookingController);

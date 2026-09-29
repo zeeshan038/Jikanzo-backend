@@ -69,4 +69,6 @@ export {
   emitBookingRequestNew,
   emitBookingRequestUpdated,
   emitBookingRequestExpired,
+  emitBookingExtensionRequested,
+  emitBookingExtensionUpdated,
 } from './bookingEmit';

@@ -5,7 +5,8 @@ import {
     deleteMoment, 
     appreciateMoment,
     markMomentAsSeen,
-    getCompanionMoments
+    getCompanionMoments,
+    getFeedTopMoments,
 } from '../../controllers/user/moments';
 import { verifyUser } from '../../middlewares/verifyUser';
 
@@ -14,6 +15,7 @@ const router = express.Router();
 router.use(verifyUser);
 
 router.post('/create', createMoment);
+router.get('/feed/top', getFeedTopMoments);
 router.get('/feed', getFeedMoments);
 router.get('/all', getCompanionMoments);
 router.post('/:id/appreciate', appreciateMoment);

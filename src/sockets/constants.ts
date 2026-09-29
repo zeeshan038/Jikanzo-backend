@@ -8,6 +8,10 @@ export const SOCKET_EVENTS = {
   REQUEST_UPDATED: 'booking:request:updated',
   REQUEST_EXPIRED: 'booking:request:expired',
   REQUESTS_COUNT: 'booking:requests:count',
+  /** Client requested extra hours — open extension bottom sheet (companion: accept/deny, client: waiting). */
+  EXTENSION_REQUESTED: 'booking:extension:requested',
+  /** Companion accepted/denied extension — update or close bottom sheet on both sides. */
+  EXTENSION_UPDATED: 'booking:extension:updated',
 } as const;
 
 /** Client → server */

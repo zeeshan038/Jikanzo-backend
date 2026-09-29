@@ -48,6 +48,7 @@ model User {
   gender           String?           @default("")
   age              Int?              @default(0)
   gallery          String[]          @default([])
+  galleryLayout    String            @default("1") // Profile gallery template: "1", "2", or "3"
   intros           String[]          @default([])
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt

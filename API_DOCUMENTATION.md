@@ -936,64 +936,9 @@ This document outlines the API endpoints available in the backend.
 
 ---
 
-## POST /booking/complete
-**Summary**: Complete a booking
+## Booking completion (cron, no HTTP endpoint)
 
-**Tags**: Booking
-
-### Request Body
-```json
-{
-  "type": "object",
-  "properties": {
-    "bookingId": {
-      "type": "integer"
-    },
-    "otp": {
-      "type": "string"
-    }
-  },
-  "required": [
-    "bookingId",
-    "otp"
-  ]
-}
-```
-
-### Responses
-- **200**: Booking status updated to COMPLETED successfully
-  **Example Response**:
-  ```json
-  {
-    "status": true,
-    "msg": "Booking completed successfully",
-    "data": {
-      "id": 1,
-      "status": "COMPLETED"
-    }
-  }
-  ```
-- **400**: Validation Error
-  **Response Schema**:
-  ```json
-  {
-    "$ref": "#/components/schemas/ApiError"
-  }
-  ```
-- **404**: Booking not found
-  **Response Schema**:
-  ```json
-  {
-    "$ref": "#/components/schemas/ApiError"
-  }
-  ```
-- **500**: Internal Server Error
-  **Response Schema**:
-  ```json
-  {
-    "$ref": "#/components/schemas/ApiError"
-  }
-  ```
+ACTIVE bookings are set to **COMPLETED** automatically when `endTime` has passed (cron runs every minute in `src/cron/booking.ts`). Clients receive `booking:request:updated` over Socket.io. **POST /booking/complete** was removed.
 
 ---
 

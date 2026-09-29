@@ -97,7 +97,8 @@ export const getCompanionsFeed = async (req: Request, res: Response) => {
                     select: {
                         id: true,
                         username: true,
-                        profileImage: true
+                        profileImage: true,
+                        about: true,
                     }
                 },
                 ...(currentUserId ? { feedStats: { where: { userId: Number(currentUserId) } } } : {})
@@ -160,10 +161,17 @@ export const getCompanionsFeed = async (req: Request, res: Response) => {
         const total = interleaved.length;
         const paginated = interleaved.slice(skip, skip + limit);
 
-        // Remove extra fields from response
+        // Remove extra fields from response; bio lives on CompanionProfile but many users only fill User.about
         const sanitizedCompanions = paginated.map((companion: any) => {
-            const { feedStats, finalScore, bucket, jssScore, completedMeetups, ...rest } = companion;
-            return rest;
+            const { feedStats, finalScore, bucket, jssScore, completedMeetups, user, ...rest } = companion;
+            const profileBio = typeof rest.bio === 'string' ? rest.bio.trim() : '';
+            const aboutBio = typeof user?.about === 'string' ? user.about.trim() : '';
+            const { about: _about, ...userWithoutAbout } = user ?? {};
+            return {
+                ...rest,
+                bio: profileBio || aboutBio || null,
+                user: userWithoutAbout,
+            };
         });
 
         return res.status(200).json({
@@ -210,6 +218,7 @@ export const specificCompanion = async (req: Request, res: Response): Promise<an
                         languages: true,
                         activityType: true,
                         gallery: true,
+                        galleryLayout: true,
                         intros: true
                     }
                 },

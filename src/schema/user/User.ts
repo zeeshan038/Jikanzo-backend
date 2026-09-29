@@ -31,5 +31,21 @@ export const UpdateProfileSchema = Joi.object({
   profileImage: Joi.string().uri().allow('', null).optional(),
   gallery: Joi.array().items(Joi.string().uri().allow('', null)).optional(),
   intros: Joi.array().items(Joi.string().uri().allow('', null)).optional(),
-  serviceRadius: Joi.number().integer().min(0).allow(null).optional()
+  serviceRadius: Joi.number().integer().min(0).allow(null).optional(),
+  galleryLayout: Joi.alternatives()
+    .try(Joi.string().valid('1', '2', '3'), Joi.number().valid(1, 2, 3))
+    .optional(),
 });
+
+export const UploadGallerySchema = Joi.object({
+  galleryLayout: Joi.alternatives()
+    .try(Joi.string().valid('1', '2', '3'), Joi.number().valid(1, 2, 3))
+    .required(),
+  images: Joi.array().items(Joi.string().uri()).min(1).required(),
+});
+
+export function normalizeGalleryLayout(value: string | number): '1' | '2' | '3' {
+  const s = String(value);
+  if (s === '1' || s === '2' || s === '3') return s;
+  throw new Error('galleryLayout must be 1, 2, or 3');
+}

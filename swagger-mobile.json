@@ -774,6 +774,162 @@
                     }
                 }
             },
+            "WhoamiUser": {
+                "type": "object",
+                "required": [
+                    "gallery",
+                    "galleryLayout"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "username": {
+                        "type": "string",
+                        "example": "traveler_jane"
+                    },
+                    "phone": {
+                        "type": "string",
+                        "example": "+1234567890"
+                    },
+                    "role": {
+                        "type": "string",
+                        "example": "BOTH"
+                    },
+                    "profileImage": {
+                        "type": "string",
+                        "nullable": true,
+                        "example": "https://cdn.jikanzo.com/users/jane_profile_pic.jpg"
+                    },
+                    "about": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "languages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "activityType": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "savedLocations": {
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        }
+                    },
+                    "gender": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "age": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "walletBalance": {
+                        "type": "number",
+                        "example": 0
+                    },
+                    "gallery": {
+                        "type": "array",
+                        "description": "All gallery image URLs",
+                        "items": {
+                            "type": "string",
+                            "format": "uri"
+                        },
+                        "example": [
+                            "https://cdn.jikanzo.com/users/jane_gallery_1.jpg",
+                            "https://cdn.jikanzo.com/users/jane_gallery_2.jpg"
+                        ]
+                    },
+                    "galleryLayout": {
+                        "type": "string",
+                        "enum": [
+                            "1",
+                            "2",
+                            "3"
+                        ],
+                        "description": "Profile gallery UI template (1, 2, or 3)",
+                        "example": "2"
+                    },
+                    "intros": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "companionProfile": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            }
+                        }
+                    },
+                    "profileProgress": {
+                        "type": "integer",
+                        "description": "Profile completeness 0-100",
+                        "example": 100
+                    }
+                }
+            },
+            "WhoamiResponse": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "msg": {
+                        "type": "string",
+                        "example": "User profile fetched successfully"
+                    },
+                    "user": {
+                        "$ref": "#/components/schemas/WhoamiUser"
+                    }
+                },
+                "example": {
+                    "status": true,
+                    "msg": "User profile fetched successfully",
+                    "user": {
+                        "id": 1,
+                        "username": "traveler_jane",
+                        "phone": "+1234567890",
+                        "role": "BOTH",
+                        "profileImage": "https://cdn.jikanzo.com/users/jane_profile_pic.jpg",
+                        "about": "Hi, I am a professional companion who loves traveling and meeting new people!",
+                        "languages": [
+                            "English",
+                            "Japanese"
+                        ],
+                        "activityType": [
+                            "Dinner",
+                            "City Tour"
+                        ],
+                        "savedLocations": [],
+                        "gender": "Female",
+                        "age": 24,
+                        "walletBalance": 0,
+                        "gallery": [
+                            "https://cdn.jikanzo.com/users/jane_gallery_1.jpg",
+                            "https://cdn.jikanzo.com/users/jane_gallery_2.jpg"
+                        ],
+                        "galleryLayout": "2",
+                        "intros": [],
+                        "companionProfile": {
+                            "id": 12
+                        },
+                        "profileProgress": 100
+                    }
+                }
+            },
             "UpdateProfileRequest": {
                 "type": "object",
                 "properties": {
@@ -819,6 +975,13 @@
                             "type": "string",
                             "format": "uri"
                         }
+                    },
+                    "galleryLayout": {
+                        "oneOf": [
+                            { "type": "string", "enum": ["1", "2", "3"] },
+                            { "type": "integer", "enum": [1, 2, 3] }
+                        ],
+                        "description": "Profile gallery template (optional on update-profile)"
                     },
                     "intros": {
                         "type": "array",
@@ -1403,6 +1566,7 @@
                     "User"
                 ],
                 "summary": "Update the user's gallery with an array of image URLs",
+                "description": "Requires galleryLayout (1, 2, or 3) for the profile gallery template. New images are appended to gallery.",
                 "security": [
                     {
                         "bearerAuth": []
@@ -1415,16 +1579,31 @@
                             "schema": {
                                 "type": "object",
                                 "properties": {
+                                    "galleryLayout": {
+                                        "oneOf": [
+                                            { "type": "string", "enum": ["1", "2", "3"] },
+                                            { "type": "integer", "enum": [1, 2, 3] }
+                                        ],
+                                        "description": "Gallery UI layout template"
+                                    },
                                     "images": {
                                         "type": "array",
                                         "items": {
                                             "type": "string",
                                             "format": "uri"
-                                        }
+                                        },
+                                        "minItems": 1
                                     }
                                 },
                                 "required": [
+                                    "galleryLayout",
                                     "images"
+                                ]
+                            },
+                            "example": {
+                                "galleryLayout": "2",
+                                "images": [
+                                    "https://cdn.example.com/gallery/photo1.jpg"
                                 ]
                             }
                         }
@@ -1444,7 +1623,18 @@
                                         "msg": {
                                             "type": "string"
                                         },
+                                        "galleryLayout": {
+                                            "type": "string",
+                                            "enum": ["1", "2", "3"]
+                                        },
                                         "urls": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string",
+                                                "format": "uri"
+                                            }
+                                        },
+                                        "gallery": {
                                             "type": "array",
                                             "items": {
                                                 "type": "string",
@@ -2165,6 +2355,7 @@
                     "User"
                 ],
                 "summary": "Get current logged in user details",
+                "description": "Returns the authenticated user profile including **gallery** (all uploaded image URLs) and **galleryLayout** (\"1\", \"2\", or \"3\") set via POST /user/upload-gallery or update-profile.",
                 "security": [
                     {
                         "bearerAuth": []
@@ -2175,135 +2366,8 @@
                         "description": "User details fetched successfully",
                         "content": {
                             "application/json": {
-                                "example": {
-                                    "status": true,
-                                    "msg": "User profile fetched successfully",
-                                    "user": {
-                                        "id": "507f1f77bcf86cd799439011",
-                                        "username": "traveler_jane",
-                                        "phone": "+1234567890",
-                                        "role": "USER",
-                                        "profileImage": "https://cdn.jikanzo.com/users/jane_profile_pic.jpg",
-                                        "about": "Hi, I am a professional companion who loves traveling and meeting new people!",
-                                        "languages": [
-                                            "English",
-                                            "Japanese"
-                                        ],
-                                        "activityType": [
-                                            "Dinner",
-                                            "City Tour",
-                                            "Event Companion"
-                                        ],
-                                        "savedLocations": [
-                                            {
-                                                "name": "Tokyo Tower",
-                                                "lat": 35.6586,
-                                                "lng": 139.7454
-                                            }
-                                        ],
-                                        "gender": "Female",
-                                        "age": 24,
-                                        "walletBalance": 0,
-                                        "gallery": [
-                                            "https://cdn.jikanzo.com/users/jane_gallery_1.jpg"
-                                        ],
-                                        "intros": [
-                                            "https://cdn.jikanzo.com/users/jane_intro_video.mp4"
-                                        ],
-                                        "profileProgress": 100
-                                    }
-                                },
                                 "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "status": {
-                                            "type": "boolean"
-                                        },
-                                        "msg": {
-                                            "type": "string"
-                                        },
-                                        "user": {
-                                            "type": "object",
-                                            "properties": {
-                                                "id": {
-                                                    "type": "integer"
-                                                },
-                                                "username": {
-                                                    "type": "string"
-                                                },
-                                                "phone": {
-                                                    "type": "string"
-                                                },
-                                                "role": {
-                                                    "type": "string"
-                                                },
-                                                "profileImage": {
-                                                    "type": "string",
-                                                    "nullable": true
-                                                },
-                                                "about": {
-                                                    "type": "string",
-                                                    "nullable": true
-                                                },
-                                                "languages": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "string"
-                                                    }
-                                                },
-                                                "activityType": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "string"
-                                                    }
-                                                },
-                                                "savedLocations": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "object",
-                                                        "properties": {
-                                                            "name": {
-                                                                "type": "string"
-                                                            },
-                                                            "lat": {
-                                                                "type": "number"
-                                                            },
-                                                            "lng": {
-                                                                "type": "number"
-                                                            }
-                                                        }
-                                                    }
-                                                },
-                                                "gender": {
-                                                    "type": "string",
-                                                    "nullable": true
-                                                },
-                                                "age": {
-                                                    "type": "integer",
-                                                    "nullable": true
-                                                },
-                                                "walletBalance": {
-                                                    "type": "number"
-                                                },
-                                                "gallery": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "string"
-                                                    }
-                                                },
-                                                "intros": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "string"
-                                                    }
-                                                },
-                                                "profileProgress": {
-                                                    "type": "integer",
-                                                    "description": "Percentage of profile completeness (0-100)"
-                                                }
-                                            }
-                                        }
-                                    }
+                                    "$ref": "#/components/schemas/WhoamiResponse"
                                 }
                             }
                         }
@@ -2330,6 +2394,12 @@
                     }
                 }
             }
+        },
+        "/api/user/whoami": {
+            "$ref": "#/paths/~1user~1whoami"
+        },
+        "/api/user/upload-gallery": {
+            "$ref": "#/paths/~1user~1upload-gallery"
         },
         "/user/check-progress": {
             "get": {
@@ -2562,91 +2632,6 @@
                                 "example": {
                                     "status": true,
                                     "msg": "Booking accepted successfully"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Validation Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ApiError"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Booking not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ApiError"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ApiError"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/booking/complete": {
-            "post": {
-                "tags": [
-                    "Booking"
-                ],
-                "summary": "Complete a booking",
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "bookingId": {
-                                        "type": "integer"
-                                    },
-                                    "otp": {
-                                        "type": "string"
-                                    }
-                                },
-                                "required": [
-                                    "bookingId",
-                                    "otp"
-                                ]
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Booking status updated to COMPLETED successfully",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/MessageResponse"
-                                },
-                                "example": {
-                                    "status": true,
-                                    "msg": "Booking completed successfully",
-                                    "data": {
-                                        "id": 1,
-                                        "status": "COMPLETED"
-                                    }
                                 }
                             }
                         }
@@ -3896,6 +3881,68 @@
                 }
             }
         },
+        "/moments/feed/top": {
+            "get": {
+                "tags": ["Moments"],
+                "summary": "Top 3 moment companions for feed header",
+                "description": "Returns up to 3 companions with non-expired moments (saved companions by default, or nearby). Unseen stories first. Use profileImage for the overlapping avatar row; hasUnseen true = highlight ring (e.g. blue).",
+                "security": [{ "bearerAuth": [] }],
+                "parameters": [
+                    {
+                        "name": "type",
+                        "in": "query",
+                        "schema": { "type": "string", "enum": ["saved", "nearby"] },
+                        "description": "Default saved (followed companions). Use nearby with lat/lng."
+                    },
+                    { "name": "lat", "in": "query", "schema": { "type": "number" } },
+                    { "name": "lng", "in": "query", "schema": { "type": "number" } },
+                    { "name": "radius", "in": "query", "schema": { "type": "number", "default": 50 } }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Top moments fetched successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": { "type": "boolean", "example": true },
+                                        "msg": { "type": "string", "example": "Top moments fetched successfully" },
+                                        "data": {
+                                            "type": "array",
+                                            "maxItems": 3,
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "companionId": { "type": "integer" },
+                                                    "username": { "type": "string" },
+                                                    "profileImage": { "type": "string" },
+                                                    "hasUnseen": {
+                                                        "type": "boolean",
+                                                        "description": "True if user has not seen all moments for this companion"
+                                                    },
+                                                    "momentCount": { "type": "integer" },
+                                                    "latestMoment": {
+                                                        "type": "object",
+                                                        "nullable": true,
+                                                        "properties": {
+                                                            "momentId": { "type": "integer" },
+                                                            "mediaUrl": { "type": "string" },
+                                                            "createdAt": { "type": "string", "format": "date-time" },
+                                                            "isSeen": { "type": "boolean" }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/moments/feed": {
             "get": {
                 "tags": [
@@ -5013,6 +5060,68 @@
                 }
             }
         },
+        "/api/moments/feed/top": {
+            "get": {
+                "tags": ["Moments"],
+                "summary": "Top 3 moment companions for feed header",
+                "description": "Returns up to 3 companions with non-expired moments (saved companions by default, or nearby). Unseen stories first. Use profileImage for the overlapping avatar row; hasUnseen true = highlight ring (e.g. blue).",
+                "security": [{ "bearerAuth": [] }],
+                "parameters": [
+                    {
+                        "name": "type",
+                        "in": "query",
+                        "schema": { "type": "string", "enum": ["saved", "nearby"] },
+                        "description": "Default saved (followed companions). Use nearby with lat/lng."
+                    },
+                    { "name": "lat", "in": "query", "schema": { "type": "number" } },
+                    { "name": "lng", "in": "query", "schema": { "type": "number" } },
+                    { "name": "radius", "in": "query", "schema": { "type": "number", "default": 50 } }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Top moments fetched successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": { "type": "boolean", "example": true },
+                                        "msg": { "type": "string", "example": "Top moments fetched successfully" },
+                                        "data": {
+                                            "type": "array",
+                                            "maxItems": 3,
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "companionId": { "type": "integer" },
+                                                    "username": { "type": "string" },
+                                                    "profileImage": { "type": "string" },
+                                                    "hasUnseen": {
+                                                        "type": "boolean",
+                                                        "description": "True if user has not seen all moments for this companion"
+                                                    },
+                                                    "momentCount": { "type": "integer" },
+                                                    "latestMoment": {
+                                                        "type": "object",
+                                                        "nullable": true,
+                                                        "properties": {
+                                                            "momentId": { "type": "integer" },
+                                                            "mediaUrl": { "type": "string" },
+                                                            "createdAt": { "type": "string", "format": "date-time" },
+                                                            "isSeen": { "type": "boolean" }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/moments/feed": {
             "get": {
                 "tags": [
@@ -5274,6 +5383,16 @@
                                                 }
                                             }
                                         },
+                                        "momentsAnalytics": {
+                                            "type": "object",
+                                            "description": "Lifetime totals across all posted moments (same as companion dashboard)",
+                                            "properties": {
+                                                "totalViews": { "type": "integer" },
+                                                "totalLikes": { "type": "integer" },
+                                                "totalRings": { "type": "integer" },
+                                                "totalDiamonds": { "type": "integer" }
+                                            }
+                                        },
                                         "pagination": {
                                             "type": "object",
                                             "properties": {
@@ -5514,6 +5633,70 @@
                                                         "repeatRate": {
                                                             "type": "number",
                                                             "example": 26
+                                                        }
+                                                    }
+                                                },
+                                                "momentsAnalytics": {
+                                                    "type": "object",
+                                                    "description": "Same shape as GET /feed/specific/:userId — overlay stats (views, hearts, rings, diamonds)",
+                                                    "properties": {
+                                                        "totalViews": { "type": "integer", "example": 1100 },
+                                                        "totalLikes": { "type": "integer", "example": 1100 },
+                                                        "totalRings": { "type": "integer", "example": 286 },
+                                                        "totalDiamonds": { "type": "integer", "example": 125 }
+                                                    }
+                                                },
+                                                "moments": {
+                                                    "type": "object",
+                                                    "description": "Companion's own moments and appreciation totals received on them",
+                                                    "properties": {
+                                                        "posted": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "total": {
+                                                                    "type": "integer",
+                                                                    "description": "All-time moment posts (including expired)"
+                                                                },
+                                                                "active": {
+                                                                    "type": "integer",
+                                                                    "description": "Non-expired moments currently live"
+                                                                },
+                                                                "list": {
+                                                                    "type": "array",
+                                                                    "description": "Active moments, newest first",
+                                                                    "items": {
+                                                                        "type": "object",
+                                                                        "properties": {
+                                                                            "id": { "type": "integer" },
+                                                                            "mediaUrl": { "type": "string" },
+                                                                            "caption": { "type": "string", "nullable": true },
+                                                                            "likes": { "type": "integer" },
+                                                                            "rings": { "type": "integer" },
+                                                                            "diamonds": { "type": "integer" },
+                                                                            "viewCount": { "type": "integer" },
+                                                                            "createdAt": { "type": "string", "format": "date-time" },
+                                                                            "expiresAt": { "type": "string", "format": "date-time" }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        },
+                                                        "appreciations": {
+                                                            "type": "object",
+                                                            "description": "Aggregated across all of this companion's moments",
+                                                            "properties": {
+                                                                "views": {
+                                                                    "type": "integer",
+                                                                    "description": "Total moment views (unique viewer per moment)"
+                                                                },
+                                                                "likes": { "type": "integer" },
+                                                                "rings": { "type": "integer" },
+                                                                "diamonds": { "type": "integer" },
+                                                                "total": {
+                                                                    "type": "integer",
+                                                                    "description": "likes + rings + diamonds"
+                                                                }
+                                                            }
                                                         }
                                                     }
                                                 },

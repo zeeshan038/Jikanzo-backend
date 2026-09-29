@@ -10,7 +10,9 @@ import {
     SendOtpSchema,
     VerifyOtpSchema,
     LoginSchema,
-    UpdateProfileSchema
+    UpdateProfileSchema,
+    UploadGallerySchema,
+    normalizeGalleryLayout,
 } from '../../schema/user/User';
 
 //Utils
@@ -400,6 +402,9 @@ export const updateProfile = async (req: Request, res: Response): Promise<any> =
         if (payload.profileImage !== undefined) updateData.profileImage = payload.profileImage;
         if (payload.gallery !== undefined) updateData.gallery = payload.gallery;
         if (payload.intros !== undefined) updateData.intros = payload.intros;
+        if (payload.galleryLayout !== undefined) {
+            updateData.galleryLayout = normalizeGalleryLayout(payload.galleryLayout);
+        }
 
         if (payload.serviceRadius !== undefined) {
             updateData.companionProfile = {
@@ -424,10 +429,18 @@ export const updateProfile = async (req: Request, res: Response): Promise<any> =
             }
         }
 
-        const updatedUser = await prisma.user.update({
+        await prisma.user.update({
             where: { id: userId },
             data: updateData
         });
+
+        // Keep companionProfile.bio in sync when the app edits User.about (feed reads bio)
+        if (payload.about !== undefined) {
+            await prisma.companionProfile.updateMany({
+                where: { userId },
+                data: { bio: payload.about },
+            });
+        }
 
         return res.status(200).json({
             status: true,
@@ -468,6 +481,7 @@ export const whoami = async (req: Request, res: Response): Promise<any> => {
                 age: true,
                 walletBalance: true,
                 gallery: true,
+                galleryLayout: true,
                 intros: true,
                 companionProfile: {
                     select: {
@@ -503,8 +517,10 @@ export const whoami = async (req: Request, res: Response): Promise<any> => {
             msg: "User profile fetched successfully",
             user: {
                 ...user,
-                profileProgress
-            }
+                gallery: user.gallery ?? [],
+                galleryLayout: user.galleryLayout ?? '1',
+                profileProgress,
+            },
         });
     } catch (error: any) {
         return res.status(500).json({
@@ -625,30 +641,37 @@ export const UpdateFcm = async (req: Request, res: Response): Promise<any> =>{
  */
 export const uploadGallery = async (req: Request, res: Response): Promise<any> => {
     const userId = (req as any).user?.id;
-    
+
+    const validation = UploadGallerySchema.validate(req.body);
+    if (validation.error) {
+        const errors = validation.error.details.map((d: any) => d.message).join(', ');
+        return res.status(400).json({ status: false, msg: errors });
+    }
+
     try {
-        const { images } = req.body;
+        const { images } = validation.value;
+        const galleryLayout = normalizeGalleryLayout(validation.value.galleryLayout);
 
-        if (!images || !Array.isArray(images) || images.length === 0) {
-            return res.status(400).json({
-                status: false,
-                msg: "No image URLs provided for gallery."
-            });
-        }
-
-        await prisma.user.update({
+        const updated = await prisma.user.update({
             where: { id: userId },
             data: {
+                galleryLayout,
                 gallery: {
-                    push: images
-                }
-            }
+                    push: images,
+                },
+            },
+            select: {
+                gallery: true,
+                galleryLayout: true,
+            },
         });
 
         return res.status(200).json({
             status: true,
             msg: "Gallery updated successfully",
-            urls: images
+            galleryLayout: updated.galleryLayout,
+            urls: images,
+            gallery: updated.gallery,
         });
     } catch (error: any) {
         return res.status(500).json({
@@ -743,3 +766,5 @@ export const testPushNotification = async (req: Request, res: Response): Promise
         });
     }
 };
+
+

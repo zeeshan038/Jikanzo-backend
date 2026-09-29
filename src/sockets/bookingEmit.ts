@@ -72,6 +72,9 @@ async function buildBookingUpdatePayload(bookingId: number) {
     activity: booking.activity,
     paymentStatus: booking.paymentStatus,
     extensionStatus: booking.extensionStatus,
+    extensionHours: booking.extensionHours,
+    extensionAmount: booking.extensionAmount,
+    extensionPaymentStatus: booking.extensionPaymentStatus,
     cancellationReason: booking.cancellationReason,
     cancellationReasonCode: booking.cancellationReasonCode,
     createdAt: booking.createdAt,
@@ -142,4 +145,106 @@ export async function emitBookingRequestExpired(
 
 export async function emitInitialCompanionCount(companionProfileId: number) {
   await emitRequestsCount(companionProfileId);
+}
+
+async function buildExtensionSheetPayload(bookingId: number) {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: bookingDetailInclude,
+  });
+  if (!booking) return null;
+
+  const currency = process.env.BOOKING_CURRENCY || 'USD';
+
+  return {
+    bookingId: booking.id,
+    status: booking.status,
+    date: booking.date,
+    startTime: booking.startTime,
+    endTime: booking.endTime,
+    address: booking.address,
+    activity: booking.activity,
+    paymentStatus: booking.paymentStatus,
+    extensionStatus: booking.extensionStatus,
+    extensionHours: booking.extensionHours,
+    extensionAmount: booking.extensionAmount,
+    extensionPaymentStatus: booking.extensionPaymentStatus,
+    currency,
+    client: buildClientSummary(booking),
+    companionProfile: buildCompanionPublicProfile(booking),
+    paymentSummary: buildPaymentSummary(booking),
+  };
+}
+
+function emitExtensionEventToParties(
+  eventName: string,
+  bookingId: number,
+  clientId: number,
+  companionProfileId: number,
+  payload: object
+) {
+  if (!io) return;
+  io.to(bookingRoom(bookingId)).emit(eventName, payload);
+  io.to(userRoom(clientId)).emit(eventName, payload);
+  io.to(companionRoom(companionProfileId)).emit(eventName, payload);
+}
+
+/** After POST /api/booking/request-extension/:id */
+export async function emitBookingExtensionRequested(bookingId: number) {
+  if (!io) return;
+
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    select: { clientId: true, companionId: true },
+  });
+  if (!booking) return;
+
+  const sheet = await buildExtensionSheetPayload(bookingId);
+  if (!sheet) return;
+
+  const eventPayload = {
+    ...sheet,
+    bottomSheet: {
+      companion: true,
+      client: true,
+    },
+  };
+
+  emitExtensionEventToParties(
+    SOCKET_EVENTS.EXTENSION_REQUESTED,
+    bookingId,
+    booking.clientId,
+    booking.companionId,
+    eventPayload
+  );
+}
+
+/** After POST /api/booking/respond-extension/:id */
+export async function emitBookingExtensionUpdated(bookingId: number) {
+  if (!io) return;
+
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    select: { clientId: true, companionId: true },
+  });
+  if (!booking) return;
+
+  const sheet = await buildExtensionSheetPayload(bookingId);
+  if (!sheet) return;
+
+  const eventPayload = {
+    ...sheet,
+    bottomSheet: {
+      companion: sheet.extensionStatus === 'PENDING',
+      client: sheet.extensionStatus === 'PENDING',
+    },
+  };
+
+  emitExtensionEventToParties(
+    SOCKET_EVENTS.EXTENSION_UPDATED,
+    bookingId,
+    booking.clientId,
+    booking.companionId,
+    eventPayload
+  );
 }

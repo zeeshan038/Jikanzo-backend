@@ -21,6 +21,8 @@ import {
   recalculateBookingAmount,
 } from "../../utils/bookingHelpers";
 import {
+  emitBookingExtensionRequested,
+  emitBookingExtensionUpdated,
   emitBookingRequestNew,
   emitBookingRequestUpdated,
 } from "../../sockets";
@@ -213,46 +215,6 @@ export const acceptBookingController = async (req: Request, res: Response) => {
     });
   }
 };
-
-/**
- * @Description Complete a booking
- * @Route POST /api/booking/complete
- * @Access Private
- */
-export const completeBookingController = async (req: Request, res: Response) => {
-  const { bookingId, otp } = req.body;
-
-  try {
-    const booking = await prisma.booking.findUnique({
-      where: { id: bookingId }
-    });
-
-    if (!booking) {
-      return res.status(404).json({ status: false, msg: "Booking not found" });
-    }
-
-    if (booking.otp !== otp) {
-      return res.status(400).json({ status: false, msg: "Invalid OTP provided" });
-    }
-
-    const updatedBooking = await prisma.booking.update({
-      where: { id: bookingId },
-      data: { status: 'COMPLETED' }
-    });
-
-    // Trigger JSS Recalculation asynchronously
-    calculateJSS(booking.companionId).catch(err => console.error("JSS Calculation Error:", err));
-
-    return res.status(200).json({
-      status: true,
-      msg: "Booking completed successfully",
-      data: updatedBooking
-    });
-  } catch (error: any) {
-    res.status(500).json({ status: false, msg: error.message });
-  }
-};
-
 
 /**
  * @Description Pay for a booking with wallet balance
@@ -505,6 +467,10 @@ export const requestExtension = async (req: Request, res: Response) => {
       }
     });
 
+    emitBookingExtensionRequested(bookingId).catch((err) =>
+      console.error('[Socket] emitBookingExtensionRequested:', err)
+    );
+
     return res.status(200).json({
       status: true,
       msg: "Extension request sent to companion",
@@ -604,6 +570,13 @@ export const respondToExtension = async (req: Request, res: Response) => {
       where: { id: bookingId },
       data: updateData
     });
+
+    emitBookingExtensionUpdated(bookingId).catch((err) =>
+      console.error('[Socket] emitBookingExtensionUpdated:', err)
+    );
+    emitBookingRequestUpdated(bookingId).catch((err) =>
+      console.error('[Socket] emitBookingRequestUpdated:', err)
+    );
 
     return res.status(200).json({
       status: true,
@@ -1045,3 +1018,6 @@ export const verifyBookingOtpController = async (req: Request, res: Response) =>
     return res.status(500).json({ status: false, msg: error.message });
   }
 };
+
+
+
