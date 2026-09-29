@@ -12,6 +12,14 @@ export const SOCKET_EVENTS = {
   EXTENSION_REQUESTED: 'booking:extension:requested',
   /** Companion accepted/denied extension — update or close bottom sheet on both sides. */
   EXTENSION_UPDATED: 'booking:extension:updated',
+  /** Cron: remind client to open extension UI before meeting start (30 or 15 min). */
+  EXTENSION_PROMPT: 'booking:extension:prompt',
+} as const;
+
+/** Values for booking:extension:prompt payload.promptType */
+export const EXTENSION_PROMPT_TYPES = {
+  BEFORE_START_30_MIN: '30_MIN_BEFORE_START',
+  BEFORE_START_15_MIN: '15_MIN_BEFORE_START',
 } as const;
 
 /** Client → server */

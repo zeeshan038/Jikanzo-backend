@@ -6,8 +6,11 @@ import {
   buildCompanionPublicProfile,
   buildPaymentSummary,
 } from '../utils/bookingHelpers';
-import { 
-  BOOKING_REQUEST_EXPIRY_MS, SOCKET_EVENTS } from './constants';
+import {
+  BOOKING_REQUEST_EXPIRY_MS,
+  EXTENSION_PROMPT_TYPES,
+  SOCKET_EVENTS,
+} from './constants';
 import { bookingRoom, companionRoom, userRoom } from './rooms';
 
 let io: Server | null = null;
@@ -247,4 +250,36 @@ export async function emitBookingExtensionUpdated(bookingId: number) {
     booking.companionId,
     eventPayload
   );
+}
+
+export type ExtensionPromptType =
+  (typeof EXTENSION_PROMPT_TYPES)[keyof typeof EXTENSION_PROMPT_TYPES];
+
+/** Cron / reminders — client-only extension bottom sheet before meeting start. */
+export async function emitBookingExtensionPrompt(
+  bookingId: number,
+  promptType: ExtensionPromptType
+) {
+  if (!io) return;
+
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    select: { clientId: true, companionId: true },
+  });
+  if (!booking) return;
+
+  const sheet = await buildExtensionSheetPayload(bookingId);
+  if (!sheet) return;
+
+  const eventPayload = {
+    ...sheet,
+    promptType,
+    bottomSheet: {
+      client: true,
+      companion: false,
+    },
+  };
+
+  io.to(bookingRoom(bookingId)).emit(SOCKET_EVENTS.EXTENSION_PROMPT, eventPayload);
+  io.to(userRoom(booking.clientId)).emit(SOCKET_EVENTS.EXTENSION_PROMPT, eventPayload);
 }

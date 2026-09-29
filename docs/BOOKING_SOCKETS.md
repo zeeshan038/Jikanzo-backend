@@ -92,15 +92,16 @@ You **do not** need to join these rooms yourself.
 | 4 | `booking:request:expired` | Client + companion — request timed out |
 | 5 | `booking:extension:requested` | Client + companion — open **extension** bottom sheet |
 | 6 | `booking:extension:updated` | Client + companion — extension accepted/denied; close or refresh sheet |
+| 7 | `booking:extension:prompt` | **Client only** — cron reminder 30 / 15 min before `startTime` (+ matching push) |
 
 ### Messages **from app to server** (you **send** with `socket.emit`)
 
 | # | Exact event name | When to send |
 |---|------------------|--------------|
-| 7 | `booking:subscribe` | User opened one booking detail screen |
-| 8 | `booking:unsubscribe` | User left that screen |
+| 8 | `booking:subscribe` | User opened one booking detail screen |
+| 9 | `booking:unsubscribe` | User left that screen |
 
-There are **8 booking socket event names** today (6 server → app, 2 app → server).
+There are **9 booking socket event names** today (7 server → app, 2 app → server).
 
 ---
 
@@ -453,7 +454,39 @@ You may also receive `booking:request:updated` on the same action (for booking l
 
 ---
 
-### Event 7: `booking:subscribe` (app → server)
+### Event 7: `booking:extension:prompt`
+
+**Direction:** Server → your app  
+
+**Who should listen:** **Client only** (companion does not receive this).
+
+**When does the server send it?**
+
+- Cron (every minute): **30 minutes** and **15 minutes** before `startTime` for paid, **ACCEPTED** bookings.
+- Same moment as FCM push (`EXTENSION_PROMPT_30` / `EXTENSION_PROMPT_15`).
+
+**Payload:** Same booking/extension sheet fields as event 5, plus:
+
+| Field | Meaning |
+|-------|---------|
+| `promptType` | `"30_MIN_BEFORE_START"` or `"15_MIN_BEFORE_START"` |
+| `bottomSheet.client` | `true` — show extension request UI |
+| `bottomSheet.companion` | `false` |
+
+**What to do in the app:**
+
+- Open extension bottom sheet (client chooses hours → `POST /api/booking/request-extension/:id`).
+- On push tap, read `data.bookingId` and `data.action === 'SHOW_EXTENSION_SHEET'`.
+
+```javascript
+socket.on('booking:extension:prompt', (body) => {
+  // body.promptType, body.bookingId, body.bottomSheet.client === true
+});
+```
+
+---
+
+### Event 8: `booking:subscribe` (app → server)
 
 **Direction:** Your app → server  
 
@@ -483,7 +516,7 @@ Server checks you are the client or companion on that booking. If yes, you also 
 
 ---
 
-### Event 8: `booking:unsubscribe` (app → server)
+### Event 9: `booking:unsubscribe` (app → server)
 
 **Direction:** Your app → server  
 

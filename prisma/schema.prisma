@@ -131,6 +131,8 @@ model Booking {
   extensionPaymentStatus String @default("PENDING") // PENDING, PAID, FAILED (extension charge)
   extensionHours Int?
   extensionAmount Float?
+  extensionPrompt30SentAt DateTime?
+  extensionPrompt15SentAt DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
