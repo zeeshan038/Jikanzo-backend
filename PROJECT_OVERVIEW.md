@@ -53,7 +53,9 @@ jikanzo-backend/
 │   ├── middlewares/      # Express middlewares (Auth, Validation)
 │   ├── routes/           # API route definitions
 │   └── utils/            # Helper functions (Notifications, JSS calc)
-├── swagger.json          # OpenAPI specifications
+├── swagger-mobile.json   # OpenAPI — mobile app
+├── swagger-admin.json    # OpenAPI — admin dashboard
+├── swagger.json          # Combined (npm run swagger:merge)
 ├── .env                  # Environment variables
 └── package.json          # Project dependencies and scripts
 ```

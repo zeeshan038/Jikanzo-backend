@@ -30,27 +30,57 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), strip
 
 app.use(express.json());
 
-// Swagger Setup
+// Swagger Setup (mobile + admin specs at repo root)
 import swaggerUi from 'swagger-ui-express';
-import fs from 'fs'; 
+import fs from 'fs';
 import path from 'path';
 
-const swaggerDocument = JSON.parse(
-  fs.readFileSync(path.join(__dirname, '../swagger.json'), 'utf-8')
-);
+const openApiDir = path.join(__dirname, '..');
 
-const options = {
+function loadOpenApi(filename: string) {
+  return JSON.parse(fs.readFileSync(path.join(openApiDir, filename), 'utf-8'));
+}
+
+const swaggerMobile = loadOpenApi('swagger-mobile.json');
+const swaggerAdmin = loadOpenApi('swagger-admin.json');
+const swaggerCombined = loadOpenApi('swagger.json');
+
+const sendJson =
+  (doc: object) =>
+  (_req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.send(doc);
+  };
+
+app.get('/swagger-mobile.json', sendJson(swaggerMobile));
+app.get('/swagger-admin.json', sendJson(swaggerAdmin));
+app.get('/swagger.json', sendJson(swaggerCombined));
+
+// serveFiles embeds each spec in its own swagger-ui-init.js (shared swaggerUi.serve breaks multi-spec)
+const swaggerExplorerOpts = {
   swaggerOptions: {
-    url: '/swagger.json'
-  }
+    urls: [
+      { url: '/swagger-mobile.json', name: 'Mobile app' },
+      { url: '/swagger-admin.json', name: 'Admin dashboard' },
+    ],
+  },
 };
-app.use('/swagger', swaggerUi.serve, swaggerUi.setup(undefined, options));
 
-// Serve the raw swagger JSON
-app.get('/swagger.json', (req: Request, res: Response) => {
-  res.setHeader('Content-Type', 'application/json');
-  res.send(swaggerDocument);
-});
+app.use(
+  '/swagger/mobile',
+  ...swaggerUi.serveFiles(swaggerMobile),
+  swaggerUi.setup(swaggerMobile, { customSiteTitle: 'Jikanzo Mobile API' })
+);
+app.use(
+  '/swagger/admin',
+  ...swaggerUi.serveFiles(swaggerAdmin),
+  swaggerUi.setup(swaggerAdmin, { customSiteTitle: 'Jikanzo Admin API' })
+);
+app.use(
+  '/swagger',
+  ...swaggerUi.serveFiles(undefined, swaggerExplorerOpts),
+  swaggerUi.setup(null, { ...swaggerExplorerOpts, explorer: true })
+);
 
 
 //Routes

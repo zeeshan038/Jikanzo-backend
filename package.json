@@ -8,7 +8,9 @@
     "dev": "nodemon src/index.ts",
     "build": "tsc",
     "test": "vitest",
-    "test:sockets": "ts-node scripts/test-booking-sockets.ts"
+    "test:sockets": "ts-node scripts/test-booking-sockets.ts",
+    "create-admin": "ts-node scripts/create-admin.ts",
+    "swagger:merge": "ts-node scripts/merge-swagger.ts"
   },
   "keywords": [],
   "author": "",

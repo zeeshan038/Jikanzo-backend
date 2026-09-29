@@ -3,7 +3,21 @@ import jwt from 'jsonwebtoken';
 //Genrate token
 export const genrateToken = (id: string) => {
     return jwt.sign({ _id: id }, process.env.JWT_SECRET as string, { expiresIn: '7d' });
-}
+};
+
+export type AdminJwtPayload = {
+  _id: string;
+  type: 'admin';
+  role: string;
+};
+
+export const generateAdminToken = (adminId: number, role: string) => {
+  return jwt.sign(
+    { _id: String(adminId), type: 'admin', role } satisfies AdminJwtPayload,
+    process.env.JWT_SECRET as string,
+    { expiresIn: '7d' }
+  );
+};
 
 
 /**

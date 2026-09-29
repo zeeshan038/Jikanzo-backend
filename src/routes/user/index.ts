@@ -13,8 +13,10 @@ import availabilityRouter from './availability';
 import companionRouter from './companion';
 import reviewRouter from './review';
 import notificationRouter from './notification';
+import adminRouter from '../admin/admin';
 
 router.use('/user', userRouter);
+router.use('/admin', adminRouter);
 router.use('/feed', feedRouter);
 router.use('/booking', bookingRouter);
 router.use('/stripe', stripeRouter);
