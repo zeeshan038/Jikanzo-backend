@@ -73,15 +73,11 @@ export function getQuickRepliesForMessageId(messageId: string): PredefinedMessag
     .filter((m): m is PredefinedMessage => m != null);
 }
 
-export function isBookingMessagingAvailable(
-  booking: Pick<Booking, 'status' | 'paymentStatus'>
-): boolean {
-  return booking.status === 'ACCEPTED' && booking.paymentStatus === 'PAID';
+export function isBookingMessagingAvailable(booking: Pick<Booking, 'status'>): boolean {
+  return booking.status === 'ACCEPTED';
 }
 
-export function messagingUnavailableReason(
-  booking: Pick<Booking, 'status' | 'paymentStatus'>
-): string | null {
+export function messagingUnavailableReason(booking: Pick<Booking, 'status'>): string | null {
   if (isBookingMessagingAvailable(booking)) return null;
   if (booking.status === 'ACTIVE' || booking.status === 'COMPLETED') {
     return 'Booking messages are unavailable after the session starts.';
@@ -91,9 +87,6 @@ export function messagingUnavailableReason(
   }
   if (booking.status !== 'ACCEPTED') {
     return 'Messaging is available after the companion accepts the booking.';
-  }
-  if (booking.paymentStatus !== 'PAID') {
-    return 'Messaging is available after payment is completed.';
   }
   return 'Messaging is not available for this booking.';
 }

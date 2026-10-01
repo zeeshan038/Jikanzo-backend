@@ -4,7 +4,7 @@ Controlled chat for a booking: users **search** flexible text but the server onl
 
 ## When messaging is open
 
-- **Open:** `status === ACCEPTED` and `paymentStatus === PAID`
+- **Open:** `status === ACCEPTED` (payment not required until payment module is live)
 - **Closed:** session start (`status === ACTIVE`), cancelled, etc.
 
 ## HTTP (Bearer auth)

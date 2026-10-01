@@ -3135,7 +3135,7 @@
             "post": {
                 "tags": ["Messaging"],
                 "summary": "Send predefined booking message",
-                "description": "Send only an approved messageId. Free text is rejected. Requires ACCEPTED + PAID until session starts.",
+                "description": "Send only an approved messageId. Free text is rejected. Requires ACCEPTED until session starts.",
                 "security": [{ "bearerAuth": [] }],
                 "parameters": [
                     { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
