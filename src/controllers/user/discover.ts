@@ -1,4 +1,3 @@
-
 import { Request, Response } from 'express';
 import prismaClient from '../../config/db';
 
@@ -7,7 +6,6 @@ import prismaClient from '../../config/db';
  * @Route GET /api/discover/people
  * @Access Private 
  */
-/** Default search radius: 5 km, in meters (matches typical map / geolocation APIs). */
 const DEFAULT_RADIUS_METERS = 5000;
 const MAX_RADIUS_METERS = 500_000;
 

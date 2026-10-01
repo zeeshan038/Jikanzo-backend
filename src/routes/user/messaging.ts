@@ -1,7 +1,6 @@
 import express from 'express';
 import {
   getMessageCatalog,
-  searchMessages,
   getMessagingStatus,
   listBookingMessages,
   getQuickReplies,
@@ -14,7 +13,6 @@ const router = express.Router();
 router.use(verifyUser);
 
 router.get('/catalog', getMessageCatalog);
-router.get('/search', searchMessages);
 router.get('/:id/status', getMessagingStatus);
 router.get('/:id/quick-replies', getQuickReplies);
 router.get('/:id', listBookingMessages);

@@ -3043,9 +3043,10 @@
             "get": {
                 "tags": ["Messaging"],
                 "summary": "Predefined messaging catalog",
-                "description": "Approved main messages, quick replies, and search aliases (paginated). Only messageId values from this catalog may be sent via POST /messaging/{id}.",
+                "description": "Approved main messages, quick replies, and search aliases. Without `q`: paginated full catalog. With `q`: up to 4 ranked suggestions in `messages` (aliases omitted). Only catalog `id` values may be sent via POST /messaging/{id}.",
                 "security": [{ "bearerAuth": [] }],
                 "parameters": [
+                    { "name": "q", "in": "query", "schema": { "type": "string" }, "description": "Optional search text (max 4 matches). When set, `page`/`limit` are ignored." },
                     { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1, "default": 1 } },
                     { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 } }
                 ],
@@ -3062,6 +3063,7 @@
                                             "type": "object",
                                             "properties": {
                                                 "version": { "type": "string", "example": "1.0.0" },
+                                                "searchQuery": { "type": "string", "description": "Present when `q` was used" },
                                                 "pagination": {
                                                     "type": "object",
                                                     "properties": {
@@ -3081,47 +3083,6 @@
                                                             "text": { "type": "string" },
                                                             "type": { "type": "string", "enum": ["main", "quick_reply", "system"] },
                                                             "aliases": { "type": "array", "items": { "type": "string" } }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/messaging/search": {
-            "get": {
-                "tags": ["Messaging"],
-                "summary": "Search predefined messages",
-                "security": [{ "bearerAuth": [] }],
-                "parameters": [
-                    { "name": "q", "in": "query", "schema": { "type": "string" }, "description": "Search text (not sent to other user)" }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Up to 4 suggestions",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "status": { "type": "boolean" },
-                                        "data": {
-                                            "type": "object",
-                                            "properties": {
-                                                "results": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "object",
-                                                        "properties": {
-                                                            "id": { "type": "string" },
-                                                            "text": { "type": "string" },
-                                                            "type": { "type": "string" }
                                                         }
                                                     }
                                                 }

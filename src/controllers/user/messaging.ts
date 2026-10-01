@@ -115,6 +115,32 @@ function serializeMessage(row: {
  * @Access Private
  */
 export const getMessageCatalog = async (req: Request, res: Response): Promise<void> => {
+  const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+
+  if (q) {
+    const messages = searchPredefinedMessages(q).map(({ id, text, type }) => ({
+      id,
+      text,
+      type,
+    }));
+    res.status(200).json({
+      status: true,
+      data: {
+        version: CATALOG_VERSION,
+        searchQuery: q,
+        messages,
+        pagination: {
+          page: 1,
+          limit: messages.length,
+          total: messages.length,
+          totalPages: 1,
+          hasMore: false,
+        },
+      },
+    });
+    return;
+  }
+
   const pageRaw = Number(req.query.page);
   const limitRaw = Number(req.query.limit);
   const page = Number.isFinite(pageRaw) && pageRaw >= 1 ? Math.floor(pageRaw) : 1;
@@ -149,17 +175,6 @@ export const getMessageCatalog = async (req: Request, res: Response): Promise<vo
       },
     },
   });
-};
-
-/**
- * @Description Search approved predefined messages (max 4)
- * @Route GET /api/messaging/search
- * @Access Private
- */
-export const searchMessages = async (req: Request, res: Response): Promise<void> => {
-  const q = typeof req.query.q === 'string' ? req.query.q : '';
-  const results = searchPredefinedMessages(q).map(({ id, text, type }) => ({ id, text, type }));
-  res.status(200).json({ status: true, data: { results } });
 };
 
 /**

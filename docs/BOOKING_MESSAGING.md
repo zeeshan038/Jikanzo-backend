@@ -11,8 +11,7 @@ Controlled chat for a booking: users **search** flexible text but the server onl
 
 | Method | Path | Purpose |
 |--------|------|--------|
-| GET | `/api/messaging/catalog?page=1&limit=50` | Predefined library + aliases (paginated, default limit 50, max 100) |
-| GET | `/api/messaging/search?q=` | Server search (max 4) |
+| GET | `/api/messaging/catalog?page=1&limit=50` | Full library + aliases (paginated). With **`q`**: server search (max 4), same `messages` array shape (no `aliases` on hits). |
 | GET | `/api/messaging/:id/status` | `{ available, reason }` — `:id` = booking id |
 | GET | `/api/messaging/:id` | History + availability |
 | GET | `/api/messaging/:id/quick-replies?forMessageId=` | Contextual replies |
@@ -53,7 +52,7 @@ Not written to the in-app notifications list.
 
 1. Open booking messages → `GET /api/messaging/:id/status` and `GET /api/messaging/:id`.
 2. `booking:subscribe` for live updates.
-3. Search → catalog locally and/or `GET /api/messaging/search`.
+3. Search → `GET /api/messaging/catalog?q=...` (or cache full catalog via paginated `catalog` without `q`).
 4. Send → `POST /api/messaging/:id` with selected `messageId`.
 5. On receive → `GET .../quick-replies?forMessageId=` or use `quickRepliesForReceiver` from POST ack.
 6. Location: send quick reply `qr_share_my_location`, confirm on device, then `POST` with `messageId: location_shared` + coords.
