@@ -711,6 +711,40 @@
                     }
                 }
             },
+            "BookingTrackingParticipantDto": {
+                "type": "object",
+                "properties": {
+                    "role": { "type": "string", "enum": ["client", "companion"] },
+                    "userId": { "type": "integer" },
+                    "sharing": { "type": "boolean" },
+                    "latitude": { "type": "number", "nullable": true },
+                    "longitude": { "type": "number", "nullable": true },
+                    "updatedAt": { "type": "string", "format": "date-time", "nullable": true },
+                    "distanceToMeetingKm": { "type": "number", "nullable": true },
+                    "etaToMeetingMinutes": { "type": "integer", "nullable": true }
+                }
+            },
+            "BookingLiveTrackingStateDto": {
+                "type": "object",
+                "description": "Live map snapshot (REST + socket booking:tracking:state). GPS updates use sockets booking:tracking:update.",
+                "properties": {
+                    "bookingId": { "type": "integer", "example": 90 },
+                    "sessionActive": { "type": "boolean" },
+                    "allowed": { "type": "boolean", "description": "True when booking status is ACCEPTED" },
+                    "reason": { "type": "string", "nullable": true },
+                    "meeting": {
+                        "type": "object",
+                        "properties": {
+                            "latitude": { "type": "number", "nullable": true },
+                            "longitude": { "type": "number", "nullable": true },
+                            "address": { "type": "string", "nullable": true }
+                        }
+                    },
+                    "client": { "$ref": "#/components/schemas/BookingTrackingParticipantDto" },
+                    "companion": { "$ref": "#/components/schemas/BookingTrackingParticipantDto" },
+                    "distanceBetweenKm": { "type": "number", "nullable": true }
+                }
+            },
             "CompanionDto": {
                 "type": "object",
                 "properties": {
@@ -3394,6 +3428,96 @@
                             }
                         }
                     }
+                }
+            }
+        },
+        "/booking/{id}/tracking": {
+            "get": {
+                "tags": ["Booking"],
+                "summary": "Live tracking snapshot",
+                "description": "Returns meeting point plus last known client/companion positions for the booking map. Allowed when booking is ACCEPTED until session start. Pair with Socket.io events booking:tracking:join and booking:tracking:update for realtime GPS.",
+                "security": [{ "bearerAuth": [] }],
+                "parameters": [
+                    { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "description": "Booking ID" }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Tracking state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": { "type": "boolean", "example": true },
+                                        "data": { "$ref": "#/components/schemas/BookingLiveTrackingStateDto" }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": { "description": "Invalid booking id", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+                    "403": { "description": "Not a participant", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+                    "404": { "description": "Booking not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } }
+                }
+            }
+        },
+        "/booking/{id}/tracking/join": {
+            "post": {
+                "tags": ["Booking"],
+                "summary": "Join live tracking session",
+                "description": "Marks the current user as sharing location for this booking and broadcasts booking:tracking:state to participants. No request body.",
+                "security": [{ "bearerAuth": [] }],
+                "parameters": [
+                    { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "description": "Booking ID" }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Joined",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": { "type": "boolean", "example": true },
+                                        "msg": { "type": "string", "example": "Joined live tracking" },
+                                        "data": { "$ref": "#/components/schemas/BookingLiveTrackingStateDto" }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": { "description": "Invalid id or tracking not allowed", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+                    "403": { "description": "Not a participant", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } }
+                }
+            }
+        },
+        "/booking/{id}/tracking/leave": {
+            "post": {
+                "tags": ["Booking"],
+                "summary": "Leave live tracking session",
+                "description": "Stops sharing location for the current user. No request body.",
+                "security": [{ "bearerAuth": [] }],
+                "parameters": [
+                    { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "description": "Booking ID" }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Left session",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": { "type": "boolean", "example": true },
+                                        "msg": { "type": "string", "example": "Left live tracking" },
+                                        "data": { "$ref": "#/components/schemas/BookingLiveTrackingStateDto" }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": { "description": "Invalid booking id", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+                    "403": { "description": "Not a participant", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } }
                 }
             }
         },
