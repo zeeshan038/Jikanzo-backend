@@ -7,8 +7,12 @@ import prismaClient from '../../config/db';
  * @Route GET /api/discover/people
  * @Access Private 
  */
+/** Default search radius: 5 km, in meters (matches typical map / geolocation APIs). */
+const DEFAULT_RADIUS_METERS = 5000;
+const MAX_RADIUS_METERS = 500_000;
+
 export const discoverPeople = async (req: Request, res: Response) => {
-    const { lat, lng, radius = 50 } = req.query;
+    const { lat, lng, radius = DEFAULT_RADIUS_METERS } = req.query;
     try {
         if (!lat || !lng) {
             return res.status(400).json({
@@ -19,19 +23,29 @@ export const discoverPeople = async (req: Request, res: Response) => {
 
         const userLat = parseFloat(lat as string);
         const userLng = parseFloat(lng as string);
-        const searchRadius = parseFloat(radius as string);
+        const radiusMeters = parseFloat(radius as string);
 
-        if (isNaN(userLat) || isNaN(userLng) || isNaN(searchRadius)) {
+        if (isNaN(userLat) || isNaN(userLng) || isNaN(radiusMeters)) {
             return res.status(400).json({
                 status: false,
                 msg: "Invalid latitude, longitude, or radius."
             });
         }
 
+        if (radiusMeters <= 0) {
+            return res.status(400).json({
+                status: false,
+                msg: "Radius must be greater than 0.",
+            });
+        }
+
+        const cappedRadiusMeters = Math.min(radiusMeters, MAX_RADIUS_METERS);
+        const searchRadiusKm = cappedRadiusMeters / 1000;
+
         // Calculate bounding box for initial filter
         // 1 degree of latitude = ~111.045 km
-        const latDelta = searchRadius / 111.045;
-        const lngDelta = searchRadius / (111.045 * Math.cos(userLat * (Math.PI / 180)));
+        const latDelta = searchRadiusKm / 111.045;
+        const lngDelta = searchRadiusKm / (111.045 * Math.cos(userLat * (Math.PI / 180)));
 
 
 
@@ -88,9 +102,14 @@ export const discoverPeople = async (req: Request, res: Response) => {
                 userLat, userLng,
                 companion.locationLat as number, companion.locationLng as number
             );
-            return { ...companion, distance };
-        }).filter(c => c.distance <= searchRadius)
-          .sort((a, b) => a.distance - b.distance);
+            return {
+                ...companion,
+                distance: distance,
+                distanceMeters: Math.round(distance * 1000),
+            };
+        })
+            .filter((c) => c.distance <= searchRadiusKm)
+            .sort((a, b) => a.distance - b.distance);
 
         return res.status(200).json({
             status: true,

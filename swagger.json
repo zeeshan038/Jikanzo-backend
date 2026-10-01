@@ -751,6 +751,10 @@
                         "type": "number",
                         "description": "Distance from search lat/lng in kilometers (Haversine)."
                     },
+                    "distanceMeters": {
+                        "type": "integer",
+                        "description": "Same distance rounded to whole meters."
+                    },
                     "user": {
                         "type": "object",
                         "properties": {
@@ -2357,7 +2361,7 @@
                     "User"
                 ],
                 "summary": "Discover people near you",
-                "description": "Returns companion profiles within radius (kilometers) of lat/lng. Uses CompanionProfile.locationLat/locationLng (synced from the first saved location on profile update).",
+                "description": "Returns companion profiles within radius (meters) of lat/lng. Uses CompanionProfile.locationLat/locationLng (synced from the first saved location on profile update).",
                 "security": [
                     {
                         "bearerAuth": []
@@ -2388,9 +2392,9 @@
                         "required": false,
                         "schema": {
                             "type": "number",
-                            "default": 50
+                            "default": 5000
                         },
-                        "description": "Search radius in **kilometers** (default 50)."
+                        "description": "Search radius in **meters** (default 5000 = 5 km). Example: 2000 = 2 km."
                     }
                 ],
                 "responses": {
