@@ -25,6 +25,7 @@ import {
   emitBookingExtensionUpdated,
   emitBookingRequestNew,
   emitBookingRequestUpdated,
+  refreshHomeBarForBooking,
 } from "../../sockets";
 import { getStoredOrComputedBreakdown } from "../../utils/bookingFinance";
 import { sendPushNotification } from "../../utils/notification";
@@ -204,10 +205,13 @@ export const acceptBookingController = async (req: Request, res: Response) => {
     emitBookingRequestUpdated(bookingId).catch((err) =>
       console.error("[Socket] emitBookingRequestUpdated:", err)
     );
+    refreshHomeBarForBooking(bookingId).catch((err) =>
+      console.error("[Socket] refreshHomeBarForBooking:", err)
+    );
 
     return res.status(200).json({
       status: true,
-      msg: `Booking ${action.toLowerCase()}ed successfully`
+      msg: `Booking ${action.toLowerCase()}ed successfully`,
     });
   } catch (error: any) {
     res.status(500).json({
@@ -651,6 +655,9 @@ export const startBookingController = async (req: Request, res: Response) => {
     emitBookingRequestUpdated(bookingId).catch((err) =>
       console.error('[Socket] emitBookingRequestUpdated:', err)
     );
+    refreshHomeBarForBooking(bookingId).catch((err) =>
+      console.error('[Socket] refreshHomeBarForBooking:', err)
+    );
 
     const pushTitle = 'Session started';
     const pushBody = 'Your booking session is now in progress.';
@@ -894,6 +901,9 @@ export const cancelBookingController = async (req: Request, res: Response) => {
     emitBookingRequestUpdated(bookingId).catch((err) =>
       console.error("[Socket] emitBookingRequestUpdated:", err)
     );
+    refreshHomeBarForBooking(bookingId).catch((err) =>
+      console.error("[Socket] refreshHomeBarForBooking:", err)
+    );
 
     const { endBookingTrackingAndNotify } = await import('../../sockets/bookingEmit');
     endBookingTrackingAndNotify(bookingId, 'Live tracking ended — booking cancelled.').catch(
@@ -987,6 +997,9 @@ export const rescheduleBookingController = async (req: Request, res: Response) =
     emitBookingRequestUpdated(bookingId).catch((err) =>
       console.error("[Socket] emitBookingRequestUpdated:", err)
     );
+    refreshHomeBarForBooking(bookingId).catch((err) =>
+      console.error("[Socket] refreshHomeBarForBooking:", err)
+    );
 
     return res.status(200).json({
       status: true,
@@ -1051,6 +1064,10 @@ export const verifyBookingOtpController = async (req: Request, res: Response) =>
       where: { id: bookingId },
       data: { otpVerified: true },
     });
+
+    refreshHomeBarForBooking(bookingId).catch((err) =>
+      console.error("[Socket] refreshHomeBarForBooking:", err)
+    );
 
     return res.status(200).json({
       status: true,

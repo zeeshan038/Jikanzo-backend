@@ -31,7 +31,7 @@ Design reference: map with route, ETA, distance, progress — each side sees **s
 | Socket auth + `booking:{id}` room | `booking:subscribe` |
 | Distance helper | `calculateDistance` in `src/utils/methods.ts` |
 | Chat one-shot location | `location_shared` in messaging (not live) |
-| Live bidirectional tracking | **Not built** |
+| Live bidirectional tracking | **Built** — sockets + REST (§6–7) |
 
 ---
 
@@ -39,7 +39,7 @@ Design reference: map with route, ETA, distance, progress — each side sees **s
 
 1. **Who shares:** **Both** client and companion on that booking (each device sends its own GPS).
 2. **Who views:** **Both** — same live session; each sees the other’s latest position (+ self on map).
-3. **When live tracking is allowed:** Booking **`ACCEPTED` + `PAID`**.  
+3. **When live tracking is allowed:** Booking **`ACCEPTED`** (same as messaging until payment module is live).  
    - **Stop (recommended MVP):** when status becomes **`ACTIVE`** (meetup started via OTP/start flow), **`COMPLETED`**, or **`CANCELLED`**.  
    - *Optional later:* continue through **`ACTIVE`** until **`COMPLETED`** (full ride-hailing parity) — confirm with PM.
 4. **How it starts:** Opening the **live map screen** (or explicit “Share location”) on either side joins the session; **both must grant location permission** to publish (viewer can still open map to see other if only one is sharing — show “Waiting for location…”).

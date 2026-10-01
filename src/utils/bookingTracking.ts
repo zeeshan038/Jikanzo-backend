@@ -13,15 +13,11 @@ const MIN_UPDATE_INTERVAL_MS = 3000;
 
 const lastUpdateByKey = new Map<string, number>();
 
-export function isLiveTrackingAllowed(
-  booking: Pick<Booking, 'status' | 'paymentStatus'>
-): boolean {
-  return booking.status === 'ACCEPTED' && booking.paymentStatus === 'PAID';
+export function isLiveTrackingAllowed(booking: Pick<Booking, 'status'>): boolean {
+  return booking.status === 'ACCEPTED';
 }
 
-export function liveTrackingBlockedReason(
-  booking: Pick<Booking, 'status' | 'paymentStatus'>
-): string | null {
+export function liveTrackingBlockedReason(booking: Pick<Booking, 'status'>): string | null {
   if (isLiveTrackingAllowed(booking)) return null;
   if (booking.status === 'ACTIVE' || booking.status === 'COMPLETED') {
     return 'Live tracking ended — session in progress or completed.';
@@ -30,10 +26,7 @@ export function liveTrackingBlockedReason(
     return 'Live tracking is not available for cancelled bookings.';
   }
   if (booking.status !== 'ACCEPTED') {
-    return 'Live tracking is available after the booking is accepted and paid.';
-  }
-  if (booking.paymentStatus !== 'PAID') {
-    return 'Live tracking is available after payment is completed.';
+    return 'Live tracking is available after the companion accepts the booking.';
   }
   return 'Live tracking is not available for this booking.';
 }

@@ -20,6 +20,7 @@ import {
   joinBookingTracking,
   leaveBookingTracking,
 } from '../../controllers/user/tracking';
+import { getHomeBookingBar } from '../../controllers/user/homeBar';
 import { verifyUser } from '../../middlewares/verifyUser';
 
 const router = express.Router();
@@ -28,6 +29,7 @@ router.use(verifyUser);
 router.get('/client', getClientBookings);
 router.get('/companion', getCompanionBookings);
 router.get('/cancel-reasons', getCancelReasons);
+router.get('/home-bar', getHomeBookingBar);
 router.get('/:id/tracking', getBookingTracking);
 router.post('/:id/tracking/join', joinBookingTracking);
 router.post('/:id/tracking/leave', leaveBookingTracking);

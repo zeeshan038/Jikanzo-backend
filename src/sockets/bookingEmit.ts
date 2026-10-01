@@ -401,3 +401,26 @@ export async function endBookingTrackingAndNotify(bookingId: number, reason: str
     await emitBookingTrackingEnded(bookingId, reason);
   }
 }
+
+export async function emitHomeBarToUser(userId: number) {
+  if (!io) return;
+  const { resolveHomeBarForUser } = await import('../utils/bookingHomeBar');
+  const payload = await resolveHomeBarForUser(userId);
+  io.to(userRoom(userId)).emit(SOCKET_EVENTS.HOME_BAR, payload);
+}
+
+export async function refreshHomeBarForBooking(bookingId: number) {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    select: { clientId: true, companion: { select: { userId: true } } },
+  });
+  if (!booking) return;
+  await emitHomeBarToUser(booking.clientId);
+  if (booking.companion.userId) {
+    await emitHomeBarToUser(booking.companion.userId);
+  }
+}
+
+export function emitInitialHomeBar(userId: number) {
+  void emitHomeBarToUser(userId);
+}

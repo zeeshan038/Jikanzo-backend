@@ -21,6 +21,8 @@ export const SOCKET_EVENTS = {
   TRACKING_STATE: 'booking:tracking:state',
   TRACKING_LOCATION: 'booking:tracking:location',
   TRACKING_ENDED: 'booking:tracking:ended',
+  /** Feed/home blue bar — upcoming booking + OTP (within 30 min of start). */
+  HOME_BAR: 'booking:home:bar',
 } as const;
 
 /** Values for booking:extension:prompt payload.promptType */

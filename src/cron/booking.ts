@@ -10,6 +10,8 @@ import {
 import { EXTENSION_PROMPT_TYPES } from '../sockets/constants';
 import type { ExtensionPromptType } from '../sockets/bookingEmit';
 import { sendPushNotification } from '../utils/notification';
+import { refreshAllActiveHomeBars } from './homeBar';
+import { refreshHomeBarForBooking } from '../sockets/bookingEmit';
 
 /** Match bookings whose startTime is ~N minutes from now (1-minute cron tick). */
 const CRON_MATCH_WINDOW_MS = 60 * 1000;
@@ -159,6 +161,9 @@ async function autoCompleteActiveBookingsPastEndTime() {
     emitBookingRequestUpdated(booking.id).catch((err) =>
       console.error('[CRON] Socket emit completed:', err)
     );
+    refreshHomeBarForBooking(booking.id).catch((err) =>
+      console.error('[CRON] refreshHomeBarForBooking:', err)
+    );
   }
 
   console.log(`[CRON] Automatically completed ${due.length} active booking(s).`);
@@ -182,5 +187,11 @@ cron.schedule('* * * * *', async () => {
     await sendScheduledExtensionPrompts();
   } catch (error) {
     console.error('[CRON] Error sending extension prompts:', error);
+  }
+
+  try {
+    await refreshAllActiveHomeBars();
+  } catch (error) {
+    console.error('[CRON] Error refreshing home booking bars:', error);
   }
 });

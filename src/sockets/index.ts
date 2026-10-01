@@ -2,7 +2,7 @@ import { Server as HttpServer } from 'http';
 import { Server } from 'socket.io';
 import prisma from '../config/db';
 import { authenticateSocket } from './auth';
-import { emitInitialCompanionCount, setSocketServer } from './bookingEmit';
+import { emitInitialCompanionCount, emitInitialHomeBar, setSocketServer } from './bookingEmit';
 import { SOCKET_CLIENT_EVENTS } from './constants';
 import { bookingRoom, companionRoom, userRoom } from './rooms';
 import { registerBookingTrackingHandlers } from './trackingHandlers';
@@ -34,6 +34,8 @@ export function initSockets(httpServer: HttpServer): Server {
       socket.join(companionRoom(companionProfileId));
       void emitInitialCompanionCount(companionProfileId);
     }
+
+    emitInitialHomeBar(userId);
 
     socket.on(SOCKET_CLIENT_EVENTS.BOOKING_SUBSCRIBE, async (payload: { bookingId?: number }) => {
       const bookingId = Number(payload?.bookingId);
@@ -77,4 +79,5 @@ export {
   emitBookingExtensionPrompt,
   emitBookingMessageNew,
   emitBookingMessagingClosed,
+  refreshHomeBarForBooking,
 } from './bookingEmit';

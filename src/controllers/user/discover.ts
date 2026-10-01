@@ -2,15 +2,12 @@ import { Request, Response } from 'express';
 import prismaClient from '../../config/db';
 
 /***
- * @Description Discover people near you
+ * @Description Discover people near you (sorted by distance; no radius limit)
  * @Route GET /api/discover/people
- * @Access Private 
+ * @Access Private
  */
-const DEFAULT_RADIUS_METERS = 5000;
-const MAX_RADIUS_METERS = 500_000;
-
 export const discoverPeople = async (req: Request, res: Response) => {
-    const { lat, lng, radius = DEFAULT_RADIUS_METERS } = req.query;
+    const { lat, lng } = req.query;
     try {
         if (!lat || !lng) {
             return res.status(400).json({
@@ -21,43 +18,18 @@ export const discoverPeople = async (req: Request, res: Response) => {
 
         const userLat = parseFloat(lat as string);
         const userLng = parseFloat(lng as string);
-        const radiusMeters = parseFloat(radius as string);
 
-        if (isNaN(userLat) || isNaN(userLng) || isNaN(radiusMeters)) {
+        if (isNaN(userLat) || isNaN(userLng)) {
             return res.status(400).json({
                 status: false,
-                msg: "Invalid latitude, longitude, or radius."
+                msg: "Invalid latitude or longitude."
             });
         }
 
-        if (radiusMeters <= 0) {
-            return res.status(400).json({
-                status: false,
-                msg: "Radius must be greater than 0.",
-            });
-        }
-
-        const cappedRadiusMeters = Math.min(radiusMeters, MAX_RADIUS_METERS);
-        const searchRadiusKm = cappedRadiusMeters / 1000;
-
-        // Calculate bounding box for initial filter
-        // 1 degree of latitude = ~111.045 km
-        const latDelta = searchRadiusKm / 111.045;
-        const lngDelta = searchRadiusKm / (111.045 * Math.cos(userLat * (Math.PI / 180)));
-
-
-
-        // Fetch companions within bounding box (public fields only for discover UI)
         const companions = await prismaClient.companionProfile.findMany({
             where: {
-                locationLat: {
-                    gte: userLat - latDelta,
-                    lte: userLat + latDelta,
-                },
-                locationLng: {
-                    gte: userLng - lngDelta,
-                    lte: userLng + lngDelta,
-                }
+                locationLat: { not: null },
+                locationLng: { not: null },
             },
             select: {
                 id: true,
@@ -83,9 +55,8 @@ export const discoverPeople = async (req: Request, res: Response) => {
             }
         });
 
-        // Haversine formula to calculate exact distance
         const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-            const R = 6371; // Earth radius in km
+            const R = 6371;
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
             const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
@@ -95,18 +66,18 @@ export const discoverPeople = async (req: Request, res: Response) => {
             return R * c;
         };
 
-        const companionsWithDistance = companions.map((companion) => {
-            const distance = calculateDistance(
-                userLat, userLng,
-                companion.locationLat as number, companion.locationLng as number
-            );
-            return {
-                ...companion,
-                distance: distance,
-                distanceMeters: Math.round(distance * 1000),
-            };
-        })
-            .filter((c) => c.distance <= searchRadiusKm)
+        const companionsWithDistance = companions
+            .map((companion) => {
+                const distance = calculateDistance(
+                    userLat, userLng,
+                    companion.locationLat as number, companion.locationLng as number
+                );
+                return {
+                    ...companion,
+                    distance,
+                    distanceMeters: Math.round(distance * 1000),
+                };
+            })
             .sort((a, b) => a.distance - b.distance);
 
         return res.status(200).json({
@@ -118,7 +89,7 @@ export const discoverPeople = async (req: Request, res: Response) => {
     } catch (error: any) {
         return res.status(500).json({
             status: false,
-            msg: error.message 
+            msg: error.message
         });
     }
-}
+};

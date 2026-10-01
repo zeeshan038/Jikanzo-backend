@@ -667,7 +667,7 @@ Use `booking:subscribe` on the messages screen so both parties receive `booking:
 
 ## 14. Live tracking (Uber-style, both sides)
 
-Full rules: **`docs/BOOKING_LIVE_TRACKING_PLAN.md`**. Allowed when booking **`ACCEPTED` + `PAID`**; ends on **`POST /api/booking/start/:id`**, cancel, or both users leave sharing.
+Full rules: **`docs/BOOKING_LIVE_TRACKING_PLAN.md`**. Allowed when booking **`ACCEPTED`** (payment gate optional until payments go live); ends on **`POST /api/booking/start/:id`**, cancel, or session end.
 
 **Subscribe:** `booking:subscribe` with `{ bookingId }` (same room as messages).
 
@@ -697,3 +697,44 @@ Full rules: **`docs/BOOKING_LIVE_TRACKING_PLAN.md`**. Allowed when booking **`AC
 | POST | `/api/booking/:id/tracking/leave` |
 
 **Flutter:** both apps call `join`, then emit `update` every ~5s; listen for `state` + `location`; use Google Directions for route/ETA on device.
+
+---
+
+## 15. Home / feed blue bar (booking reminder + OTP)
+
+Shows on the main feed **from 30 minutes before `startTime`** until the booking ends (or is cancelled). Same payload on connect, every minute (cron), and when booking status changes.
+
+### Server → client
+
+| Event | Payload |
+|-------|---------|
+| `booking:home:bar` | See below |
+
+**Visible example:**
+
+```json
+{
+  "visible": true,
+  "bookingId": 90,
+  "status": "ACCEPTED",
+  "phase": "PRE_START",
+  "startTime": "2026-10-02T11:30:00.000Z",
+  "endTime": "2026-10-02T13:30:00.000Z",
+  "otp": "7856",
+  "otpVerified": false,
+  "minutesUntilStart": 12,
+  "label": "Today's booking 4:30 PM · OTP 7856",
+  "viewerRole": "client",
+  "counterparty": { "id": 239, "username": "idrees" }
+}
+```
+
+**Hidden:** `{ "visible": false }`
+
+### REST (cold start)
+
+| Method | Path |
+|--------|------|
+| GET | `/api/booking/home-bar` |
+
+Tap bar → navigate to booking detail / live map using `bookingId`.

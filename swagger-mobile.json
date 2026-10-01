@@ -1905,7 +1905,7 @@
                     "User"
                 ],
                 "summary": "Discover people near you",
-                "description": "Returns companion profiles within radius (meters) of lat/lng. Uses CompanionProfile.locationLat/locationLng (synced from the first saved location on profile update).",
+                "description": "Returns all companions with a stored location, sorted nearest-first by distance from lat/lng (no radius filter). Uses CompanionProfile.locationLat/locationLng (synced from the first saved location on profile update).",
                 "security": [
                     {
                         "bearerAuth": []
@@ -1929,16 +1929,6 @@
                             "type": "number"
                         },
                         "description": "Search center longitude (WGS84)."
-                    },
-                    {
-                        "name": "radius",
-                        "in": "query",
-                        "required": false,
-                        "schema": {
-                            "type": "number",
-                            "default": 5000
-                        },
-                        "description": "Search radius in **meters** (default 5000 = 5 km). Example: 2000 = 2 km."
                     }
                 ],
                 "responses": {
