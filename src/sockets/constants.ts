@@ -14,6 +14,10 @@ export const SOCKET_EVENTS = {
   EXTENSION_UPDATED: 'booking:extension:updated',
   /** Cron: remind client to open extension UI before meeting start (30 or 15 min). */
   EXTENSION_PROMPT: 'booking:extension:prompt',
+  /** New predefined booking chat message in room booking:{id} */
+  MESSAGE_NEW: 'booking:message:new',
+  /** Session started — client should disable messaging UI */
+  MESSAGING_CLOSED: 'booking:messaging:closed',
 } as const;
 
 /** Values for booking:extension:prompt payload.promptType */

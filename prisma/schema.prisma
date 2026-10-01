@@ -64,6 +64,7 @@ model User {
   feedStats        FeedStat[]        @relation("UserFeedStats")
   notifications    Notification[]
   profileViews     ProfileView[]     @relation("UserViewedProfiles")
+  bookingMessagesSent BookingMessage[] @relation("BookingMessagesSent")
 }
 
 model CompanionProfile {
@@ -138,6 +139,24 @@ model Booking {
 
   client       User             @relation("ClientBookings", fields: [clientId], references: [id])
   companion    CompanionProfile @relation("CompanionBookings", fields: [companionId], references: [id])
+  messages     BookingMessage[]
+}
+
+model BookingMessage {
+  id           Int      @id @default(autoincrement())
+  bookingId    Int
+  senderUserId Int
+  messageId    String
+  text         String
+  kind         String   @default("MAIN")
+  latitude     Float?
+  longitude    Float?
+  createdAt    DateTime @default(now())
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  sender  User    @relation("BookingMessagesSent", fields: [senderUserId], references: [id])
+
+  @@index([bookingId, createdAt])
 }
 
 model Review {

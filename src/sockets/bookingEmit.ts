@@ -283,3 +283,63 @@ export async function emitBookingExtensionPrompt(
   io.to(bookingRoom(bookingId)).emit(SOCKET_EVENTS.EXTENSION_PROMPT, eventPayload);
   io.to(userRoom(booking.clientId)).emit(SOCKET_EVENTS.EXTENSION_PROMPT, eventPayload);
 }
+
+export type BookingMessageSocketPayload = {
+  id: number;
+  bookingId: number;
+  senderUserId: number;
+  messageId: string;
+  text: string;
+  kind: string;
+  latitude: number | null;
+  longitude: number | null;
+  createdAt: Date;
+};
+
+export async function emitBookingMessageNew(
+  bookingId: number,
+  message: BookingMessageSocketPayload
+) {
+  if (!io) return;
+
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    select: { clientId: true, companion: { select: { userId: true } } },
+  });
+  if (!booking) return;
+
+  const payload = {
+    bookingId,
+    message: {
+      ...message,
+      createdAt: message.createdAt.toISOString(),
+    },
+  };
+
+  io.to(bookingRoom(bookingId)).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+  io.to(userRoom(booking.clientId)).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+  if (booking.companion.userId) {
+    io.to(userRoom(booking.companion.userId)).emit(SOCKET_EVENTS.MESSAGE_NEW, payload);
+  }
+}
+
+export async function emitBookingMessagingClosed(bookingId: number) {
+  if (!io) return;
+
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    select: { clientId: true, companion: { select: { userId: true } } },
+  });
+  if (!booking) return;
+
+  const payload = {
+    bookingId,
+    reason: 'Booking messages are unavailable after the session starts.',
+  };
+
+  io.to(bookingRoom(bookingId)).emit(SOCKET_EVENTS.MESSAGING_CLOSED, payload);
+  io.to(userRoom(booking.clientId)).emit(SOCKET_EVENTS.MESSAGING_CLOSED, payload);
+  if (booking.companion.userId) {
+    io.to(userRoom(booking.companion.userId)).emit(SOCKET_EVENTS.MESSAGING_CLOSED, payload);
+  }
+}

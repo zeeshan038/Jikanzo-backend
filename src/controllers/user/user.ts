@@ -708,7 +708,19 @@ export const testPushNotification = async (req: Request, res: Response): Promise
     try {
         const userId = userIdRaw != null ? Number(userIdRaw) : NaN;
 
-        if (Number.isFinite(userId)) {
+        if (Number.isFinite(userId) && userId > 0) {
+            const user = await prisma.user.findUnique({
+                where: { id: userId },
+                select: { id: true },
+            });
+
+            if (!user) {
+                return res.status(404).json({
+                    status: false,
+                    msg: `User with id ${userId} not found. Omit userId to send FCM only, or use a valid user id from the database.`,
+                });
+            }
+
             await prisma.user.update({
                 where: { id: userId },
                 data: { fcmToken: token },

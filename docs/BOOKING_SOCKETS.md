@@ -649,3 +649,16 @@ JWT from `POST /api/user/login` after OTP.
 | **FCM** | Firebase push notification |
 
 If anything does not match the app, compare with **section 3 event names** and ask backend — use only those exact names.
+
+---
+
+## 13. Predefined booking messages (realtime)
+
+Full HTTP + rules: **`docs/BOOKING_MESSAGING.md`**.
+
+| Event | When |
+|-------|------|
+| `booking:message:new` | After `POST /api/messaging/:id` — payload `{ bookingId, message }` |
+| `booking:messaging:closed` | After session start (`POST /api/booking/start/:id`) — disable send UI |
+
+Use `booking:subscribe` on the messages screen so both parties receive `booking:message:new`.

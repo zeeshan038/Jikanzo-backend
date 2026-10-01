@@ -636,6 +636,11 @@ export const startBookingController = async (req: Request, res: Response) => {
       data: { status: 'ACTIVE' }
     });
 
+    const { emitBookingMessagingClosed } = await import('../../sockets/bookingEmit');
+    emitBookingMessagingClosed(bookingId).catch((err) =>
+      console.error('[Socket] emitBookingMessagingClosed:', err)
+    );
+
     return res.status(200).json({
       status: true,
       msg: "Booking started successfully",
