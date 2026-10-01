@@ -18,6 +18,9 @@ export const SOCKET_EVENTS = {
   MESSAGE_NEW: 'booking:message:new',
   /** Session started — client should disable messaging UI */
   MESSAGING_CLOSED: 'booking:messaging:closed',
+  TRACKING_STATE: 'booking:tracking:state',
+  TRACKING_LOCATION: 'booking:tracking:location',
+  TRACKING_ENDED: 'booking:tracking:ended',
 } as const;
 
 /** Values for booking:extension:prompt payload.promptType */
@@ -30,4 +33,7 @@ export const EXTENSION_PROMPT_TYPES = {
 export const SOCKET_CLIENT_EVENTS = {
   BOOKING_SUBSCRIBE: 'booking:subscribe',
   BOOKING_UNSUBSCRIBE: 'booking:unsubscribe',
+  TRACKING_JOIN: 'booking:tracking:join',
+  TRACKING_UPDATE: 'booking:tracking:update',
+  TRACKING_LEAVE: 'booking:tracking:leave',
 } as const;

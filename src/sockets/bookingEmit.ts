@@ -23,6 +23,18 @@ export function getSocketServer(): Server | null {
   return io;
 }
 
+/** True if the user has an active socket joined to this booking chat room. */
+export function isUserInBookingChatRoom(userId: number, bookingId: number): boolean {
+  if (!io) return false;
+  const room = io.sockets.adapter.rooms.get(bookingRoom(bookingId));
+  if (!room) return false;
+  for (const socketId of room) {
+    const sock = io.sockets.sockets.get(socketId);
+    if (sock?.data?.userId === userId) return true;
+  }
+  return false;
+}
+
 export async function countPendingRequests(companionProfileId: number): Promise<number> {
   return prisma.booking.count({
     where: { companionId: companionProfileId, status: 'PENDING' },
@@ -341,5 +353,51 @@ export async function emitBookingMessagingClosed(bookingId: number) {
   io.to(userRoom(booking.clientId)).emit(SOCKET_EVENTS.MESSAGING_CLOSED, payload);
   if (booking.companion.userId) {
     io.to(userRoom(booking.companion.userId)).emit(SOCKET_EVENTS.MESSAGING_CLOSED, payload);
+  }
+}
+
+function emitTrackingToBookingParticipants(bookingId: number, event: string, payload: unknown) {
+  if (!io) return;
+  void prisma.booking
+    .findUnique({
+      where: { id: bookingId },
+      select: { clientId: true, companion: { select: { userId: true } } },
+    })
+    .then((booking) => {
+      if (!booking || !io) return;
+      io.to(bookingRoom(bookingId)).emit(event, payload);
+      io.to(userRoom(booking.clientId)).emit(event, payload);
+      if (booking.companion.userId) {
+        io.to(userRoom(booking.companion.userId)).emit(event, payload);
+      }
+    });
+}
+
+export function emitBookingTrackingState(
+  bookingId: number,
+  state: Record<string, unknown>
+) {
+  emitTrackingToBookingParticipants(bookingId, SOCKET_EVENTS.TRACKING_STATE, state);
+}
+
+export function emitBookingTrackingLocation(
+  bookingId: number,
+  location: Record<string, unknown>
+) {
+  emitTrackingToBookingParticipants(bookingId, SOCKET_EVENTS.TRACKING_LOCATION, location);
+}
+
+export async function emitBookingTrackingEnded(bookingId: number, reason: string) {
+  emitTrackingToBookingParticipants(bookingId, SOCKET_EVENTS.TRACKING_ENDED, {
+    bookingId,
+    reason,
+  });
+}
+
+export async function endBookingTrackingAndNotify(bookingId: number, reason: string) {
+  const { endBookingTrackingSession } = await import('../utils/bookingTrackingSession');
+  const updated = await endBookingTrackingSession(bookingId);
+  if (updated) {
+    await emitBookingTrackingEnded(bookingId, reason);
   }
 }

@@ -5,6 +5,7 @@ import { authenticateSocket } from './auth';
 import { emitInitialCompanionCount, setSocketServer } from './bookingEmit';
 import { SOCKET_CLIENT_EVENTS } from './constants';
 import { bookingRoom, companionRoom, userRoom } from './rooms';
+import { registerBookingTrackingHandlers } from './trackingHandlers';
 
 export function initSockets(httpServer: HttpServer): Server {
   const io = new Server(httpServer, {
@@ -58,6 +59,8 @@ export function initSockets(httpServer: HttpServer): Server {
       if (!Number.isFinite(bookingId)) return;
       socket.leave(bookingRoom(bookingId));
     });
+
+    registerBookingTrackingHandlers(socket);
   });
 
   console.log('[Socket.io] initialized');

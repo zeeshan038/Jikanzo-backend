@@ -134,6 +134,16 @@ model Booking {
   extensionAmount Float?
   extensionPrompt30SentAt DateTime?
   extensionPrompt15SentAt DateTime?
+  trackingSessionActive   Boolean   @default(false)
+  trackingStartedAt       DateTime?
+  clientSharing           Boolean   @default(false)
+  companionSharing        Boolean   @default(false)
+  clientLastLat           Float?
+  clientLastLng           Float?
+  clientLastTrackedAt     DateTime?
+  companionLastLat        Float?
+  companionLastLng        Float?
+  companionLastTrackedAt  DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

@@ -5,12 +5,11 @@ import prismaClient from '../../config/db';
 /***
  * @Description Discover people near you
  * @Route GET /api/discover/people
- * @Access Private
+ * @Access Private 
  */
 export const discoverPeople = async (req: Request, res: Response) => {
+    const { lat, lng, radius = 50 } = req.query;
     try {
-        const { lat, lng, radius = 50 } = req.query;
-
         if (!lat || !lng) {
             return res.status(400).json({
                 status: false,
@@ -36,7 +35,7 @@ export const discoverPeople = async (req: Request, res: Response) => {
 
 
 
-        // Fetch companions within bounding box
+        // Fetch companions within bounding box (public fields only for discover UI)
         const companions = await prismaClient.companionProfile.findMany({
             where: {
                 locationLat: {
@@ -48,7 +47,17 @@ export const discoverPeople = async (req: Request, res: Response) => {
                     lte: userLng + lngDelta,
                 }
             },
-            include: {
+            select: {
+                id: true,
+                bio: true,
+                hourlyRate: true,
+                locationLat: true,
+                locationLng: true,
+                serviceRadius: true,
+                isOnline: true,
+                profileViews: true,
+                rating: true,
+                trustRank: true,
                 user: {
                     select: {
                         id: true,
@@ -74,15 +83,12 @@ export const discoverPeople = async (req: Request, res: Response) => {
             return R * c;
         };
 
-        const companionsWithDistance = companions.map(companion => {
+        const companionsWithDistance = companions.map((companion) => {
             const distance = calculateDistance(
                 userLat, userLng,
                 companion.locationLat as number, companion.locationLng as number
             );
-            return {
-                ...companion,
-                distance
-            };
+            return { ...companion, distance };
         }).filter(c => c.distance <= searchRadius)
           .sort((a, b) => a.distance - b.distance);
 

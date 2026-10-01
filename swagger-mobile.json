@@ -676,6 +676,37 @@
                     }
                 }
             },
+            "DiscoverCompanionDto": {
+                "type": "object",
+                "description": "Companion card returned by GET /discover/people (public fields only).",
+                "properties": {
+                    "id": { "type": "integer", "example": 220 },
+                    "bio": { "type": "string", "nullable": true },
+                    "hourlyRate": { "type": "number", "nullable": true, "example": 50 },
+                    "locationLat": { "type": "number", "example": 33.5650275 },
+                    "locationLng": { "type": "number", "example": 73.1522898 },
+                    "serviceRadius": { "type": "integer", "example": 10 },
+                    "isOnline": { "type": "boolean", "example": true },
+                    "profileViews": { "type": "integer", "example": 0 },
+                    "rating": { "type": "number", "example": 0 },
+                    "trustRank": { "type": "string", "example": "New" },
+                    "distance": {
+                        "type": "number",
+                        "description": "Distance from search lat/lng in kilometers (Haversine)."
+                    },
+                    "user": {
+                        "type": "object",
+                        "properties": {
+                            "id": { "type": "integer", "example": 239 },
+                            "username": { "type": "string", "example": "idrees" },
+                            "profileImage": { "type": "string", "nullable": true },
+                            "gender": { "type": "string", "nullable": true },
+                            "age": { "type": "integer", "nullable": true },
+                            "about": { "type": "string" }
+                        }
+                    }
+                }
+            },
             "CompanionDto": {
                 "type": "object",
                 "properties": {
@@ -1870,6 +1901,7 @@
                     "User"
                 ],
                 "summary": "Discover people near you",
+                "description": "Returns companion profiles within radius (kilometers) of lat/lng. Uses CompanionProfile.locationLat/locationLng (synced from the first saved location on profile update).",
                 "security": [
                     {
                         "bearerAuth": []
@@ -1882,7 +1914,8 @@
                         "required": true,
                         "schema": {
                             "type": "number"
-                        }
+                        },
+                        "description": "Search center latitude (WGS84)."
                     },
                     {
                         "name": "lng",
@@ -1890,15 +1923,18 @@
                         "required": true,
                         "schema": {
                             "type": "number"
-                        }
+                        },
+                        "description": "Search center longitude (WGS84)."
                     },
                     {
                         "name": "radius",
                         "in": "query",
                         "required": false,
                         "schema": {
-                            "type": "number"
-                        }
+                            "type": "number",
+                            "default": 50
+                        },
+                        "description": "Search radius in **kilometers** (default 50)."
                     }
                 ],
                 "responses": {
@@ -1918,7 +1954,7 @@
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/components/schemas/CompanionDto"
+                                                "$ref": "#/components/schemas/DiscoverCompanionDto"
                                             }
                                         }
                                     }
@@ -3003,11 +3039,15 @@
             "get": {
                 "tags": ["Messaging"],
                 "summary": "Predefined messaging catalog",
-                "description": "Approved main messages, quick replies, and search aliases. Only messageId values from this catalog may be sent via POST /messaging/{id}.",
+                "description": "Approved main messages, quick replies, and search aliases (paginated). Only messageId values from this catalog may be sent via POST /messaging/{id}.",
                 "security": [{ "bearerAuth": [] }],
+                "parameters": [
+                    { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1, "default": 1 } },
+                    { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 } }
+                ],
                 "responses": {
                     "200": {
-                        "description": "Catalog",
+                        "description": "Catalog page",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3018,6 +3058,16 @@
                                             "type": "object",
                                             "properties": {
                                                 "version": { "type": "string", "example": "1.0.0" },
+                                                "pagination": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "page": { "type": "integer", "example": 1 },
+                                                        "limit": { "type": "integer", "example": 50 },
+                                                        "total": { "type": "integer" },
+                                                        "totalPages": { "type": "integer" },
+                                                        "hasMore": { "type": "boolean" }
+                                                    }
+                                                },
                                                 "messages": {
                                                     "type": "array",
                                                     "items": {

@@ -662,3 +662,38 @@ Full HTTP + rules: **`docs/BOOKING_MESSAGING.md`**.
 | `booking:messaging:closed` | After session start (`POST /api/booking/start/:id`) — disable send UI |
 
 Use `booking:subscribe` on the messages screen so both parties receive `booking:message:new`.
+
+---
+
+## 14. Live tracking (Uber-style, both sides)
+
+Full rules: **`docs/BOOKING_LIVE_TRACKING_PLAN.md`**. Allowed when booking **`ACCEPTED` + `PAID`**; ends on **`POST /api/booking/start/:id`**, cancel, or both users leave sharing.
+
+**Subscribe:** `booking:subscribe` with `{ bookingId }` (same room as messages).
+
+### Client → server
+
+| Emit | Payload |
+|------|---------|
+| `booking:tracking:join` | `{ bookingId }` |
+| `booking:tracking:update` | `{ bookingId, latitude, longitude, heading?, accuracy? }` |
+| `booking:tracking:leave` | `{ bookingId }` |
+
+### Server → client
+
+| Event | Payload |
+|-------|---------|
+| `booking:tracking:state` | Full snapshot: meeting point, client + companion positions, `distanceBetweenKm`, ETA hints |
+| `booking:tracking:location` | Single update after `tracking:update` |
+| `booking:tracking:ended` | `{ bookingId, reason }` |
+| `booking:tracking:error` | `{ bookingId, msg, code? }` |
+
+### REST (optional)
+
+| Method | Path |
+|--------|------|
+| GET | `/api/booking/:id/tracking` |
+| POST | `/api/booking/:id/tracking/join` |
+| POST | `/api/booking/:id/tracking/leave` |
+
+**Flutter:** both apps call `join`, then emit `update` every ~5s; listen for `state` + `location`; use Google Directions for route/ETA on device.

@@ -442,6 +442,22 @@ export const updateProfile = async (req: Request, res: Response): Promise<any> =
             });
         }
 
+        // Discover/feed use CompanionProfile.locationLat/Lng; app often saves User.savedLocations only
+        if (payload.savedLocations !== undefined) {
+            const locs = payload.savedLocations;
+            if (Array.isArray(locs) && locs.length > 0) {
+                const first = locs[0] as { lat?: unknown; lng?: unknown };
+                const lat = typeof first.lat === 'number' ? first.lat : parseFloat(String(first.lat));
+                const lng = typeof first.lng === 'number' ? first.lng : parseFloat(String(first.lng));
+                if (Number.isFinite(lat) && Number.isFinite(lng)) {
+                    await prisma.companionProfile.updateMany({
+                        where: { userId },
+                        data: { locationLat: lat, locationLng: lng },
+                    });
+                }
+            }
+        }
+
         return res.status(200).json({
             status: true,
             msg: "Profile updated successfully"

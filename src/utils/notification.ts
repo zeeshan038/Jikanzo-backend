@@ -9,6 +9,57 @@ export type PushNotificationResult = {
   error?: string;
 };
 
+export type FcmOnlyPushResult = {
+  fcmSent: boolean;
+  messageId?: string;
+  skipReason?: string;
+  error?: string;
+};
+
+function toFcmDataPayload(data: Record<string, unknown>): { [key: string]: string } | undefined {
+  if (!data || Object.keys(data).length === 0) return undefined;
+  const fcmData: { [key: string]: string } = {};
+  for (const key of Object.keys(data)) {
+    const value = data[key];
+    fcmData[key] = typeof value === 'string' ? value : JSON.stringify(value);
+  }
+  return fcmData;
+}
+
+/** WhatsApp-style alert: FCM only, no in-app Notification row. */
+export const sendFcmPushOnly = async (
+  userId: number,
+  title: string,
+  body: string,
+  data: Record<string, unknown> = {}
+): Promise<FcmOnlyPushResult> => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { fcmToken: true },
+    });
+
+    if (!user?.fcmToken) {
+      console.log(`[FCM-only push skipped] User ID: ${userId} (no FCM token)`);
+      return { fcmSent: false, skipReason: 'NO_FCM_TOKEN' };
+    }
+
+    const message = {
+      notification: { title, body },
+      data: toFcmDataPayload(data),
+      token: user.fcmToken,
+    };
+
+    const response = await getMessaging().send(message);
+    console.log(`[FCM-only push sent] User ID: ${userId}, Message ID: ${response}`);
+    return { fcmSent: true, messageId: response };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to send FCM push';
+    console.error('[FCM-only push error]:', error);
+    return { fcmSent: false, error: message };
+  }
+};
+
 export const sendPushNotification = async (
   userId: number,
   title: string,
@@ -35,21 +86,12 @@ export const sendPushNotification = async (
     });
 
     if (user && user.fcmToken) {
-      // Format data payload (FCM only accepts string values for data)
-      let fcmData: { [key: string]: string } | undefined = undefined;
-      if (data && Object.keys(data).length > 0) {
-        fcmData = {};
-        for (const key of Object.keys(data)) {
-          fcmData[key] = typeof data[key] === 'string' ? data[key] : JSON.stringify(data[key]);
-        }
-      }
-
       const message = {
         notification: {
           title,
           body
         },
-        data: fcmData,
+        data: toFcmDataPayload(data ?? {}),
         token: user.fcmToken
       };
 

@@ -15,6 +15,11 @@ import {
   rescheduleBookingController,
   verifyBookingOtpController,
 } from '../../controllers/user/booking';
+import {
+  getBookingTracking,
+  joinBookingTracking,
+  leaveBookingTracking,
+} from '../../controllers/user/tracking';
 import { verifyUser } from '../../middlewares/verifyUser';
 
 const router = express.Router();
@@ -23,6 +28,9 @@ router.use(verifyUser);
 router.get('/client', getClientBookings);
 router.get('/companion', getCompanionBookings);
 router.get('/cancel-reasons', getCancelReasons);
+router.get('/:id/tracking', getBookingTracking);
+router.post('/:id/tracking/join', joinBookingTracking);
+router.post('/:id/tracking/leave', leaveBookingTracking);
 router.get('/detail/:id', getBookingById);
 router.get('/receipt/:id', getBookingReceipt);
 router.post('/book-companion/:id', bookCompanion);

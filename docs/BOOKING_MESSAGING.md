@@ -11,7 +11,7 @@ Controlled chat for a booking: users **search** flexible text but the server onl
 
 | Method | Path | Purpose |
 |--------|------|--------|
-| GET | `/api/messaging/catalog` | Full predefined library + aliases |
+| GET | `/api/messaging/catalog?page=1&limit=50` | Predefined library + aliases (paginated, default limit 50, max 100) |
 | GET | `/api/messaging/search?q=` | Server search (max 4) |
 | GET | `/api/messaging/:id/status` | `{ available, reason }` — `:id` = booking id |
 | GET | `/api/messaging/:id` | History + availability |
@@ -38,6 +38,16 @@ socket.emit('booking:subscribe', { bookingId: 123 });
 |-------|-----------|---------|
 | `booking:message:new` | Server → client | `{ bookingId, message: { id, senderUserId, messageId, text, kind, latitude, longitude, createdAt } }` |
 | `booking:messaging:closed` | Server → client | `{ bookingId, reason }` — emitted when session starts (`POST /api/booking/start/:id`) |
+
+## Push (FCM only, no Notification table)
+
+When someone sends a message, the **other** participant gets a device push if they have an `fcmToken` and are **not** currently subscribed to that booking’s socket room (`booking:subscribe` — i.e. chat open in app). Alert only; history stays in `BookingMessage`.
+
+- **Title:** sender `username`
+- **Body:** message text (or `Shared a location` for `location_shared`)
+- **Data:** `type=BOOKING_MESSAGE`, `bookingId`, `bookingMessageId`, `messageId` — use to open the booking chat screen
+
+Not written to the in-app notifications list.
 
 ## Mobile flow
 

@@ -6,7 +6,6 @@ import { verifyUser } from '../../middlewares/verifyUser';
 
 const router = Router();
 
-
 router.use(verifyUser)
 router.get('/people', discoverPeople);
 

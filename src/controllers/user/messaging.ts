@@ -11,7 +11,45 @@ import {
 } from '../../utils/predefinedMessaging';
 import type { BookingMessageKind } from '../../utils/predefinedMessaging';
 import { sendBookingMessageSchema } from '../../schema/user/bookingMessage';
-import { emitBookingMessageNew } from '../../sockets/bookingEmit';
+import { emitBookingMessageNew, isUserInBookingChatRoom } from '../../sockets/bookingEmit';
+import { sendFcmPushOnly } from '../../utils/notification';
+
+const PUSH_BODY_MAX_LEN = 120;
+
+async function pushBookingMessageToRecipient(params: {
+  bookingId: number;
+  senderUserId: number;
+  recipientUserId: number;
+  previewText: string;
+  bookingMessageId: number;
+  messageId: string;
+}) {
+  const { bookingId, senderUserId, recipientUserId, previewText, bookingMessageId, messageId } =
+    params;
+
+  if (isUserInBookingChatRoom(recipientUserId, bookingId)) {
+    return;
+  }
+
+  const sender = await prisma.user.findUnique({
+    where: { id: senderUserId },
+    select: { username: true },
+  });
+  const title = sender?.username?.trim() || 'New message';
+  const body =
+    messageId === 'location_shared'
+      ? 'Shared a location'
+      : previewText.length > PUSH_BODY_MAX_LEN
+        ? `${previewText.slice(0, PUSH_BODY_MAX_LEN - 1)}…`
+        : previewText;
+
+  await sendFcmPushOnly(recipientUserId, title, body, {
+    type: 'BOOKING_MESSAGE',
+    bookingId: String(bookingId),
+    bookingMessageId: String(bookingMessageId),
+    messageId,
+  });
+}
 
 async function loadBookingForMessaging(bookingId: number) {
   return prisma.booking.findUnique({
@@ -76,17 +114,39 @@ function serializeMessage(row: {
  * @Route GET /api/messaging/catalog
  * @Access Private
  */
-export const getMessageCatalog = async (_req: Request, res: Response): Promise<void> => {
+export const getMessageCatalog = async (req: Request, res: Response): Promise<void> => {
+  const pageRaw = Number(req.query.page);
+  const limitRaw = Number(req.query.limit);
+  const page = Number.isFinite(pageRaw) && pageRaw >= 1 ? Math.floor(pageRaw) : 1;
+  const limit = Number.isFinite(limitRaw)
+    ? Math.min(Math.max(Math.floor(limitRaw), 1), 100)
+    : 50;
+
+  const all = PREDEFINED_MESSAGES.map(({ id, text, type, aliases }) => ({
+    id,
+    text,
+    type,
+    aliases,
+  }));
+
+  const total = all.length;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const safePage = Math.min(page, totalPages);
+  const start = (safePage - 1) * limit;
+  const messages = all.slice(start, start + limit);
+
   res.status(200).json({
     status: true,
     data: {
       version: CATALOG_VERSION,
-      messages: PREDEFINED_MESSAGES.map(({ id, text, type, aliases }) => ({
-        id,
-        text,
-        type,
-        aliases,
-      })),
+      messages,
+      pagination: {
+        page: safePage,
+        limit,
+        total,
+        totalPages,
+        hasMore: safePage < totalPages,
+      },
     },
   });
 };
@@ -280,6 +340,20 @@ export const sendBookingMessage = async (req: Request, res: Response): Promise<v
   emitBookingMessageNew(bookingId, payload).catch((err) =>
     console.error('[Socket] emitBookingMessageNew:', err)
   );
+
+  const recipientUserId = access.isClient
+    ? access.booking.companion?.userId
+    : access.booking.clientId;
+  if (recipientUserId != null && recipientUserId !== userId) {
+    pushBookingMessageToRecipient({
+      bookingId,
+      senderUserId: userId,
+      recipientUserId,
+      previewText: predefined.text,
+      bookingMessageId: created.id,
+      messageId,
+    }).catch((err) => console.error('[FCM] booking message push:', err));
+  }
 
   const quickReplies = getQuickRepliesForMessageId(messageId).map(({ id, text, type }) => ({
     id,
