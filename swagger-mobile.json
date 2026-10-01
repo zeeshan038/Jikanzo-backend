@@ -737,11 +737,31 @@
                         "properties": {
                             "latitude": { "type": "number", "nullable": true },
                             "longitude": { "type": "number", "nullable": true },
-                            "address": { "type": "string", "nullable": true }
+                            "address": { "type": "string", "nullable": true },
+                            "hasCoordinates": { "type": "boolean", "description": "True when booking has meeting lat/lng (always show meeting pin when true)" }
                         }
                     },
                     "client": { "$ref": "#/components/schemas/BookingTrackingParticipantDto" },
                     "companion": { "$ref": "#/components/schemas/BookingTrackingParticipantDto" },
+                    "markers": {
+                        "type": "array",
+                        "description": "Exactly three logical pins: meeting (static), client (live), companion (live). Use visible + lat/lng to draw on map.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "pinId": { "type": "string", "enum": ["meeting", "client", "companion"] },
+                                "kind": { "type": "string", "enum": ["meeting", "client", "companion"] },
+                                "label": { "type": "string" },
+                                "userId": { "type": "integer", "description": "Present for client/companion pins" },
+                                "latitude": { "type": "number", "nullable": true },
+                                "longitude": { "type": "number", "nullable": true },
+                                "isLive": { "type": "boolean" },
+                                "sharing": { "type": "boolean" },
+                                "updatedAt": { "type": "string", "format": "date-time", "nullable": true },
+                                "visible": { "type": "boolean", "description": "False until coordinates exist (live pins after first GPS update)" }
+                            }
+                        }
+                    },
                     "distanceBetweenKm": { "type": "number", "nullable": true }
                 }
             },

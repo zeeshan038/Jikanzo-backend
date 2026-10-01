@@ -99,36 +99,81 @@ export function buildTrackingStatePayload(booking: BookingWithCompanionUser) {
       ) / 100;
   }
 
+  const meeting = {
+    latitude: meetingLat,
+    longitude: meetingLng,
+    address: booking.address,
+    hasCoordinates: meetingLat != null && meetingLng != null,
+  };
+
+  const client = participantSnapshot(
+    'client',
+    booking.clientId,
+    booking.clientSharing,
+    booking.clientLastLat,
+    booking.clientLastLng,
+    booking.clientLastTrackedAt,
+    meetingLat,
+    meetingLng
+  );
+
+  const companion = participantSnapshot(
+    'companion',
+    booking.companion.userId,
+    booking.companionSharing,
+    booking.companionLastLat,
+    booking.companionLastLng,
+    booking.companionLastTrackedAt,
+    meetingLat,
+    meetingLng
+  );
+
+  /** One entry per map pin — client, companion, and booking meeting place (static). */
+  const markers = [
+    {
+      pinId: 'meeting',
+      kind: 'meeting' as const,
+      label: booking.address ?? 'Meeting point',
+      latitude: meeting.latitude,
+      longitude: meeting.longitude,
+      isLive: false,
+      visible: meeting.hasCoordinates,
+    },
+    {
+      pinId: 'client',
+      kind: 'client' as const,
+      userId: client.userId,
+      label: 'Client',
+      latitude: client.latitude,
+      longitude: client.longitude,
+      isLive: true,
+      sharing: client.sharing,
+      updatedAt: client.updatedAt,
+      visible: client.latitude != null && client.longitude != null,
+    },
+    {
+      pinId: 'companion',
+      kind: 'companion' as const,
+      userId: companion.userId,
+      label: 'Companion',
+      latitude: companion.latitude,
+      longitude: companion.longitude,
+      isLive: true,
+      sharing: companion.sharing,
+      updatedAt: companion.updatedAt,
+      visible: companion.latitude != null && companion.longitude != null,
+    },
+  ];
+
   return {
     bookingId: booking.id,
     sessionActive: booking.trackingSessionActive,
     allowed: isLiveTrackingAllowed(booking),
     reason: liveTrackingBlockedReason(booking),
-    meeting: {
-      latitude: meetingLat,
-      longitude: meetingLng,
-      address: booking.address,
-    },
-    client: participantSnapshot(
-      'client',
-      booking.clientId,
-      booking.clientSharing,
-      booking.clientLastLat,
-      booking.clientLastLng,
-      booking.clientLastTrackedAt,
-      meetingLat,
-      meetingLng
-    ),
-    companion: participantSnapshot(
-      'companion',
-      booking.companion.userId,
-      booking.companionSharing,
-      booking.companionLastLat,
-      booking.companionLastLng,
-      booking.companionLastTrackedAt,
-      meetingLat,
-      meetingLng
-    ),
+    meeting,
+    client,
+    companion,
+    markers,
     distanceBetweenKm,
   };
 }
