@@ -27,6 +27,7 @@ import {
   emitBookingRequestUpdated,
 } from "../../sockets";
 import { getStoredOrComputedBreakdown } from "../../utils/bookingFinance";
+import { sendPushNotification } from "../../utils/notification";
 
 /**
  * @Description Book a companion
@@ -640,6 +641,32 @@ export const startBookingController = async (req: Request, res: Response) => {
     emitBookingMessagingClosed(bookingId).catch((err) =>
       console.error('[Socket] emitBookingMessagingClosed:', err)
     );
+
+    emitBookingRequestUpdated(bookingId).catch((err) =>
+      console.error('[Socket] emitBookingRequestUpdated:', err)
+    );
+
+    const pushTitle = 'Session started';
+    const pushBody = 'Your booking session is now in progress.';
+    const pushData = { bookingId: String(bookingId), status: 'ACTIVE' };
+    sendPushNotification(
+      booking.clientId,
+      pushTitle,
+      pushBody,
+      pushData,
+      'BOOKING_STARTED'
+    ).catch((err) => console.error('[Push] booking started (client):', err));
+
+    const companionUserId = booking.companion.userId;
+    if (companionUserId) {
+      sendPushNotification(
+        companionUserId,
+        pushTitle,
+        pushBody,
+        pushData,
+        'BOOKING_STARTED'
+      ).catch((err) => console.error('[Push] booking started (companion):', err));
+    }
 
     return res.status(200).json({
       status: true,
