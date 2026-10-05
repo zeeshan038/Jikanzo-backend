@@ -138,6 +138,7 @@ export const deleteMedia = async (req: Request, res: Response) => {
                 where: {
                     mediaUrl: url,
                     companionId: user.companionProfile.id,
+                    expiresAt: { gt: new Date() },
                 },
                 select: { id: true },
             });

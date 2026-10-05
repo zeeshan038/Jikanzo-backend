@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import prisma from "../../config/db";
+import { activeMomentsWhere } from "../../constants/moments";
 
 
 /**
@@ -80,6 +81,11 @@ export const getCompanionsFeed = async (req: Request, res: Response) => {
         }
 
         const currentUserId = (req as any).user?.id;
+
+        // Client feed must never include the viewer's own companion profile (e.g. BOTH role after become-companion)
+        if (currentUserId) {
+            whereClause.userId = { not: Number(currentUserId) };
+        }
 
         // Fetch a pool of candidates (e.g. up to 100) to sort in memory
         // A full production system might use Elasticsearch or Redis for this
@@ -236,6 +242,7 @@ export const specificCompanion = async (req: Request, res: Response): Promise<an
                     take: 10
                 },
                 moments: {
+                    where: activeMomentsWhere(),
                     orderBy: { createdAt: 'asc' },
                     include: {
                         views: {

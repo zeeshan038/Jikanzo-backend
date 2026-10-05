@@ -12,6 +12,7 @@ import './config/firebase';
 //Paths
 import routes from './routes/user/index';
 import './cron/booking';
+import './cron/moments';
 import { initSockets } from './sockets';
 
 const app = express();

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../../config/db';
+import { activeMomentsWhere } from '../../constants/moments';
 
 
 /**
@@ -146,13 +147,13 @@ export const getDashboardData = async (req: Request, res: Response): Promise<voi
         _count: { id: true },
       }),
       prisma.moment.count({
-        where: { companionId: profile.id, expiresAt: { gt: now } },
+        where: { companionId: profile.id, ...activeMomentsWhere(now) },
       }),
       prisma.momentView.count({
         where: { moment: { companionId: profile.id } },
       }),
       prisma.moment.findMany({
-        where: { companionId: profile.id, expiresAt: { gt: now } },
+        where: { companionId: profile.id, ...activeMomentsWhere(now) },
         orderBy: { createdAt: 'desc' },
         select: {
           id: true,

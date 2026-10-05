@@ -1,6 +1,11 @@
 import { Request, Response } from 'express';
 import prisma from '../../config/db';
 import { calculateDistance } from '../../utils/methods';
+import {
+    activeMomentsWhere,
+    isMomentActive,
+    momentExpiresAt,
+} from '../../constants/moments';
 
 /**
  * @Description Create a Moment (Story)
@@ -24,8 +29,7 @@ export const createMoment = async (req: Request, res: Response): Promise<any> =>
             return res.status(403).json({ status: false, msg: "Only companions can create moments" });
         }
 
-        // Moment expires 24 hours from now
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        const expiresAt = momentExpiresAt();
 
         const moment = await prisma.moment.create({
             data: {
@@ -57,10 +61,10 @@ export const getFeedMoments = async (req: Request, res: Response): Promise<any> 
 
     try {
         const now = new Date();
-        let companionIdsToFetch: number[] | null = null; 
+        let companionIdsToFetch: number[] | null = null;
         let userLat = Number(lat);
         let userLng = Number(lng);
-        let searchRadius = Number(radius) || 50; 
+        let searchRadius = Number(radius) || 50;
 
         // If type is not explicitly 'nearby', default to 'saved'
         if (type !== 'nearby') {
@@ -78,7 +82,8 @@ export const getFeedMoments = async (req: Request, res: Response): Promise<any> 
 
         // Fetch moments based on filters
         const whereClause: any = {
-            expiresAt: { gt: now }
+            ...activeMomentsWhere(now),
+            companion: { userId: { not: Number(userId) } },
         };
 
         if (companionIdsToFetch !== null) {
@@ -232,6 +237,10 @@ export const appreciateMoment = async (req: Request, res: Response): Promise<any
             return res.status(404).json({ status: false, msg: "Moment not found" });
         }
 
+        if (!isMomentActive(moment.expiresAt)) {
+            return res.status(410).json({ status: false, msg: "Moment has expired" });
+        }
+
         let updateData = {};
         if (type === 'like') updateData = { likes: { increment: 1 } };
         if (type === 'diamond') updateData = { diamonds: { increment: 1 } };
@@ -264,6 +273,10 @@ export const markMomentAsSeen = async (req: Request, res: Response): Promise<any
 
         if (!moment) {
             return res.status(404).json({ status: false, msg: "Moment not found" });
+        }
+
+        if (!isMomentActive(moment.expiresAt)) {
+            return res.status(410).json({ status: false, msg: "Moment has expired" });
         }
 
         // Upsert to ignore if it already exists (@@unique constraint)
@@ -310,8 +323,11 @@ export const getCompanionMoments = async (req: Request, res: Response): Promise<
             return res.status(404).json({ status: false, msg: "Companion profile not found" });
         }
 
+        const now = new Date();
+        const activeWhere = { companionId: companionProfile.id, ...activeMomentsWhere(now) };
+
         const [total, momentTotals, totalMomentViews, moments] = await Promise.all([
-            prisma.moment.count({ where: { companionId: companionProfile.id } }),
+            prisma.moment.count({ where: activeWhere }),
             prisma.moment.aggregate({
                 where: { companionId: companionProfile.id },
                 _sum: { likes: true, diamonds: true, rings: true },
@@ -320,7 +336,7 @@ export const getCompanionMoments = async (req: Request, res: Response): Promise<
                 where: { moment: { companionId: companionProfile.id } },
             }),
             prisma.moment.findMany({
-                where: { companionId: companionProfile.id },
+                where: activeWhere,
                 select: {
                     id: true,
                     mediaUrl: true,
@@ -404,7 +420,8 @@ export const getFeedTopMoments = async (req: Request, res: Response): Promise<an
         }
 
         const whereClause: any = {
-            expiresAt: { gt: now },
+            ...activeMomentsWhere(now),
+            companion: { userId: { not: Number(userId) } },
         };
 
         if (companionIdsToFetch !== null) {
@@ -451,7 +468,7 @@ export const getFeedTopMoments = async (req: Request, res: Response): Promise<an
                     username: m.companion.user.username,
                     profileImage: m.companion.user.profileImage,
                     allSeen: true,
-                    moments: [] as { momentId: number; mediaUrl: string; createdAt: Date; isSeen: boolean }[],
+                    moments: [] as { momentId: number; mediaUrl: string; createdAt: Date; expiresAt: Date; isSeen: boolean }[],
                 });
             }
 
@@ -465,6 +482,7 @@ export const getFeedTopMoments = async (req: Request, res: Response): Promise<an
                 momentId: m.id,
                 mediaUrl: m.mediaUrl,
                 createdAt: m.createdAt,
+                expiresAt: m.expiresAt,
                 isSeen,
             });
         }
