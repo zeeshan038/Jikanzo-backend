@@ -1,29 +1,36 @@
-# Booking predefined messaging (Phase 1)
+# Booking chat messaging
 
-Controlled chat for a booking: users **search** flexible text but the server only sends **canonical `messageId`** strings from the catalog (`docs/Jikanzo_Final_Predefined_Messaging_Developer_Spec.md`).
+WhatsApp-style chat for a booking: **free text** and **images**, plus optional legacy **predefined catalog** messages (`docs/Jikanzo_Final_Predefined_Messaging_Developer_Spec.md`).
 
 ## When messaging is open
 
-- **Open:** `status === ACCEPTED` (payment not required until payment module is live)
-- **Closed:** session start (`status === ACTIVE`), cancelled, etc.
+Same **coordination window** as voice calling (`docs/BOOKING_CALLING.md`):
+
+- **Open:** `status` is `ACCEPTED` or `ACTIVE`, and current time is from **30 minutes before `startTime`** until **`endTime`**.
+- **Closed:** before that window, after `endTime`, or when `CANCELLED` / `COMPLETED`.
 
 ## HTTP (Bearer auth)
 
 | Method | Path | Purpose |
 |--------|------|--------|
 | GET | `/api/messaging/catalog?page=1&limit=50` | Full library + aliases (paginated). With **`q`**: server search (max 4), same `messages` array shape (no `aliases` on hits). |
-| GET | `/api/messaging/:id/status` | `{ available, reason }` — `:id` = booking id |
+| GET | `/api/messaging/:id/status` | `{ available, reason, opensAt, closesAt }` — `:id` = booking id |
 | GET | `/api/messaging/:id` | History + availability |
 | GET | `/api/messaging/:id/quick-replies?forMessageId=` | Contextual replies |
-| POST | `/api/messaging/:id` | Send `{ messageId, latitude?, longitude? }` |
+| POST | `/api/messaging/:id/upload-image` | Multipart `image` → `{ imageUrl }` (booking must be ACCEPTED) |
+| POST | `/api/messaging/:id` | Send free chat or legacy predefined |
 
-**Send rules**
+**Send rules (free chat)**
 
-- Body must include **`messageId` only** (no free-text).
-- **`location_shared`** requires both `latitude` and `longitude`.
-- Other messages must not include coordinates.
+- `{ text }` — plain message (max 4000 chars).
+- `{ imageUrl }` or `{ text, imageUrl }` — photo (+ optional caption). URL must come from `POST .../upload-image` or `POST /api/user/upload-image`.
+- `{ latitude, longitude, text? }` — share live location (optional caption).
+- Do **not** mix `messageId` with free `text` / `imageUrl`.
 
-**POST response** includes `quickRepliesForReceiver` for the **other** party’s UI.
+**Send rules (legacy predefined, optional)**
+
+- `{ messageId }` or `{ messageId: location_shared, latitude, longitude }` — unchanged catalog behavior.
+- **POST response** may include `quickRepliesForReceiver` for predefined sends only.
 
 ## Realtime (Socket.io)
 
@@ -35,8 +42,10 @@ socket.emit('booking:subscribe', { bookingId: 123 });
 
 | Event | Direction | Payload |
 |-------|-----------|---------|
-| `booking:message:new` | Server → client | `{ bookingId, message: { id, senderUserId, messageId, text, kind, latitude, longitude, createdAt } }` |
-| `booking:messaging:closed` | Server → client | `{ bookingId, reason }` — emitted when session starts (`POST /api/booking/start/:id`) |
+| `booking:message:new` | Server → client | `{ bookingId, message: { id, senderUserId, messageId, text, imageUrl, kind, latitude, longitude, createdAt } }` |
+| `booking:messaging:closed` | Server → client | `{ bookingId, reason }` — window ended (cancel, complete, past `endTime`) |
+| `booking:coordination:opened` | Server → client | `{ bookingId, available, opensAt, closesAt, … }` — ~30 min before start |
+| `booking:coordination:closed` | Server → client | Same payload shape as messaging closed |
 
 ## Push (FCM only, no Notification table)
 
@@ -52,8 +61,7 @@ Not written to the in-app notifications list.
 
 1. Open booking messages → `GET /api/messaging/:id/status` and `GET /api/messaging/:id`.
 2. `booking:subscribe` for live updates.
-3. Search → `GET /api/messaging/catalog?q=...` (or cache full catalog via paginated `catalog` without `q`).
-4. Send → `POST /api/messaging/:id` with selected `messageId`.
-5. On receive → `GET .../quick-replies?forMessageId=` or use `quickRepliesForReceiver` from POST ack.
-6. Location: send quick reply `qr_share_my_location`, confirm on device, then `POST` with `messageId: location_shared` + coords.
-7. On `booking:messaging:closed`, disable search; keep history visible.
+3. Send text → `POST /api/messaging/:id` with `{ text }`.
+4. Send image → `POST /api/messaging/:id/upload-image` (multipart), then `POST /api/messaging/:id` with `{ imageUrl, text? }`.
+5. Optional legacy: catalog search + `messageId` flow (see spec doc).
+6. On `booking:messaging:closed`, disable composer; keep history visible.

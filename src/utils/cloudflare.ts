@@ -50,6 +50,13 @@ export function getCloudflarePublicBaseUrl(): string {
 }
 
 /** Object key from a URL returned by uploadToCloudflare (bucket root keys). */
+/** True if URL is under this app's R2 public CDN base (upload-image, chat uploads, etc.). */
+export function isAppHostedPublicUrl(url: string): boolean {
+    const trimmed = url.trim();
+    if (!trimmed) return false;
+    return publicUrlToObjectKey(trimmed) != null;
+}
+
 export function publicUrlToObjectKey(url: string): string | null {
     const trimmed = url.trim();
     const base = getCloudflarePublicBaseUrl();

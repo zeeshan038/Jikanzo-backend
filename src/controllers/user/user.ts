@@ -11,6 +11,7 @@ import {
     VerifyOtpSchema,
     LoginSchema,
     UpdateProfileSchema,
+    SetActiveLocationSchema,
     UploadGallerySchema,
     normalizeGalleryLayout,
 } from '../../schema/user/User';
@@ -23,6 +24,15 @@ import {
 } from '../../utils/cloudflare';
 import { sendPushNotification } from '../../utils/notification';
 import { getMessaging } from 'firebase-admin/messaging';
+import {
+    applyActiveLocationByIndex,
+    applyActiveLocationCoordinates,
+    formatActiveLocationResponse,
+    normalizeSavedLocations,
+    parseCoordinate,
+    saveUserSavedLocations,
+    syncCompanionProfileActiveLocation,
+} from '../../utils/savedLocations';
 
 
 /**
@@ -395,7 +405,9 @@ export const updateProfile = async (req: Request, res: Response): Promise<any> =
         if (payload.about !== undefined) updateData.about = payload.about;
         if (payload.languages !== undefined) updateData.languages = payload.languages;
         if (payload.activityType !== undefined) updateData.activityType = payload.activityType;
-        if (payload.savedLocations !== undefined) updateData.savedLocations = payload.savedLocations;
+        if (payload.savedLocations !== undefined) {
+            updateData.savedLocations = normalizeSavedLocations(payload.savedLocations);
+        }
         if (payload.gender !== undefined) updateData.gender = payload.gender;
         if (payload.age !== undefined) updateData.age = payload.age;
         if (payload.username !== undefined) updateData.username = payload.username;
@@ -442,20 +454,11 @@ export const updateProfile = async (req: Request, res: Response): Promise<any> =
             });
         }
 
-        // Discover/feed use CompanionProfile.locationLat/Lng; app often saves User.savedLocations only
         if (payload.savedLocations !== undefined) {
-            const locs = payload.savedLocations;
-            if (Array.isArray(locs) && locs.length > 0) {
-                const first = locs[0] as { lat?: unknown; lng?: unknown };
-                const lat = typeof first.lat === 'number' ? first.lat : parseFloat(String(first.lat));
-                const lng = typeof first.lng === 'number' ? first.lng : parseFloat(String(first.lng));
-                if (Number.isFinite(lat) && Number.isFinite(lng)) {
-                    await prisma.companionProfile.updateMany({
-                        where: { userId },
-                        data: { locationLat: lat, locationLng: lng },
-                    });
-                }
-            }
+            await syncCompanionProfileActiveLocation(
+                userId,
+                normalizeSavedLocations(updateData.savedLocations),
+            );
         }
 
         return res.status(200).json({
@@ -468,6 +471,108 @@ export const updateProfile = async (req: Request, res: Response): Promise<any> =
             status: false,
             msg: error.message
         });
+    }
+};
+
+
+/**
+ * @Description Set active location (GPS fix or pick saved index)
+ * @Route PUT /api/user/active-location
+ * @Access Private
+ */
+export const setActiveLocation = async (req: Request, res: Response): Promise<any> => {
+    const userId = (req as any).user?.id;
+
+    const result = SetActiveLocationSchema.validate(req.body);
+    if (result.error) {
+        const errors = result.error.details.map((d: any) => d.message).join(',');
+        return res.status(400).json({ status: false, msg: errors });
+    }
+
+    const payload = result.value;
+
+    try {
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { savedLocations: true },
+        });
+
+        if (!user) {
+            return res.status(404).json({ status: false, msg: 'User not found' });
+        }
+
+        let nextLocations;
+        if (payload.index !== undefined) {
+            try {
+                nextLocations = applyActiveLocationByIndex(user.savedLocations, payload.index);
+            } catch {
+                return res.status(400).json({ status: false, msg: 'Invalid location index' });
+            }
+        } else {
+            const lat = parseCoordinate(payload.lat);
+            const lng = parseCoordinate(payload.lng);
+            if (lat === null || lng === null) {
+                return res.status(400).json({ status: false, msg: 'Invalid lat or lng' });
+            }
+            nextLocations = applyActiveLocationCoordinates(
+                user.savedLocations,
+                lat,
+                lng,
+                payload.name,
+            );
+        }
+
+        const data = await saveUserSavedLocations(userId, nextLocations);
+
+        return res.status(200).json({
+            status: true,
+            msg: 'Active location updated successfully',
+            data,
+        });
+    } catch (error: any) {
+        return res.status(500).json({ status: false, msg: error.message });
+    }
+};
+
+
+/**
+ * @Description List saved locations for booking / location picker
+ * @Route GET /api/user/saved-locations
+ * @Access Private
+ */
+export const getSavedLocations = async (req: Request, res: Response): Promise<any> => {
+    const userId = (req as any).user?.id;
+
+    try {
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { savedLocations: true },
+        });
+
+        if (!user) {
+            return res.status(404).json({ status: false, msg: 'User not found' });
+        }
+
+        const savedLocations = normalizeSavedLocations(user.savedLocations);
+        const activeIndex = savedLocations.findIndex((l) => l.isActive);
+
+        return res.status(200).json({
+            status: true,
+            msg: 'Saved locations fetched successfully',
+            data: {
+                savedLocations: savedLocations.map((loc, index) => ({
+                    index,
+                    lat: loc.lat,
+                    lng: loc.lng,
+                    ...(loc.name ? { name: loc.name } : {}),
+                    isActive: loc.isActive === true,
+                })),
+                activeIndex: activeIndex >= 0 ? activeIndex : null,
+                activeLocation: formatActiveLocationResponse(savedLocations),
+            },
+        });
+    } catch (error: any) {
+        return res.status(500).json({ status: false, msg: error.message });
     }
 };
 
@@ -501,7 +606,10 @@ export const whoami = async (req: Request, res: Response): Promise<any> => {
                 intros: true,
                 companionProfile: {
                     select: {
-                        id: true
+                        id: true,
+                        locationLat: true,
+                        locationLng: true,
+                        serviceRadius: true,
                     }
                 }
             }
@@ -527,12 +635,26 @@ export const whoami = async (req: Request, res: Response): Promise<any> => {
         if (user.gallery && user.gallery.length > 0) filledFields++;
 
         const profileProgress = Math.round((filledFields / totalFields) * 100);
+        const savedLocations = normalizeSavedLocations(user.savedLocations);
+        let activeLocation = formatActiveLocationResponse(savedLocations);
+        if (
+            !activeLocation &&
+            user.companionProfile?.locationLat != null &&
+            user.companionProfile?.locationLng != null
+        ) {
+            activeLocation = {
+                lat: user.companionProfile.locationLat,
+                lng: user.companionProfile.locationLng,
+            };
+        }
 
         return res.status(200).json({
             status: true,
             msg: "User profile fetched successfully",
             user: {
                 ...user,
+                savedLocations,
+                activeLocation,
                 gallery: user.gallery ?? [],
                 galleryLayout: user.galleryLayout ?? '1',
                 profileProgress,
@@ -591,8 +713,8 @@ export const checkProfileProgress = async (req: Request, res: Response): Promise
             const companion = user.companionProfile;
             checkField(companion?.bio);
             checkField(companion?.hourlyRate);
-            checkField(companion?.locationLat);
-            checkField(companion?.locationLng);
+            const savedLocs = normalizeSavedLocations(user.savedLocations);
+            checkField(savedLocs.length > 0 ? savedLocs : companion?.locationLat);
         }
 
         const percentage = totalFields === 0 ? 0 : Math.round((completedFields / totalFields) * 100);

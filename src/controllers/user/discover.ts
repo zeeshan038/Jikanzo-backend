@@ -1,5 +1,9 @@
 import { Request, Response } from 'express';
 import prismaClient from '../../config/db';
+import {
+    discoveryLocationForCompanion,
+    haversineDistanceKm,
+} from '../../utils/savedLocations';
 
 /***
  * @Description Discover people near you (sorted by distance; no radius limit)
@@ -27,10 +31,6 @@ export const discoverPeople = async (req: Request, res: Response) => {
         }
 
         const companions = await prismaClient.companionProfile.findMany({
-            where: {
-                locationLat: { not: null },
-                locationLng: { not: null },
-            },
             select: {
                 id: true,
                 bio: true,
@@ -50,34 +50,44 @@ export const discoverPeople = async (req: Request, res: Response) => {
                         gender: true,
                         age: true,
                         about: true,
+                        savedLocations: true,
                     }
                 }
             }
         });
 
-        const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-            const R = 6371;
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                Math.sin(dLon / 2) * Math.sin(dLon / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            return R * c;
-        };
-
         const companionsWithDistance = companions
             .map((companion) => {
-                const distance = calculateDistance(
-                    userLat, userLng,
-                    companion.locationLat as number, companion.locationLng as number
+                const activeLocation = discoveryLocationForCompanion(
+                    companion.user.savedLocations,
+                    companion.locationLat,
+                    companion.locationLng,
                 );
+                if (!activeLocation) return null;
+
+                const distance = haversineDistanceKm(
+                    userLat,
+                    userLng,
+                    activeLocation.lat,
+                    activeLocation.lng,
+                );
+
+                const activePin = {
+                    lat: activeLocation.lat,
+                    lng: activeLocation.lng,
+                    ...(activeLocation.name ? { name: activeLocation.name } : {}),
+                };
+
                 return {
                     ...companion,
+                    locationLat: activePin.lat,
+                    locationLng: activePin.lng,
+                    activeLocation: activePin,
                     distance,
                     distanceMeters: Math.round(distance * 1000),
                 };
             })
+            .filter((row): row is NonNullable<typeof row> => row !== null)
             .sort((a, b) => a.distance - b.distance);
 
         return res.status(200).json({

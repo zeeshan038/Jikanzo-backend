@@ -16,8 +16,13 @@ export const SOCKET_EVENTS = {
   EXTENSION_PROMPT: 'booking:extension:prompt',
   /** New predefined booking chat message in room booking:{id} */
   MESSAGE_NEW: 'booking:message:new',
-  /** Session started — client should disable messaging UI */
+  /** Chat/calls window closed — disable composer and tear down calls */
   MESSAGING_CLOSED: 'booking:messaging:closed',
+  COORDINATION_OPENED: 'booking:coordination:opened',
+  COORDINATION_CLOSED: 'booking:coordination:closed',
+  CALL_INCOMING: 'booking:call:incoming',
+  CALL_STATE: 'booking:call:state',
+  CALL_SIGNAL: 'booking:call:signal',
   TRACKING_STATE: 'booking:tracking:state',
   TRACKING_LOCATION: 'booking:tracking:location',
   TRACKING_ENDED: 'booking:tracking:ended',
@@ -38,4 +43,5 @@ export const SOCKET_CLIENT_EVENTS = {
   TRACKING_JOIN: 'booking:tracking:join',
   TRACKING_UPDATE: 'booking:tracking:update',
   TRACKING_LEAVE: 'booking:tracking:leave',
+  CALL_SIGNAL: 'booking:call:signal',
 } as const;

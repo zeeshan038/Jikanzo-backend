@@ -300,8 +300,9 @@ export type BookingMessageSocketPayload = {
   id: number;
   bookingId: number;
   senderUserId: number;
-  messageId: string;
+  messageId: string | null;
   text: string;
+  imageUrl: string | null;
   kind: string;
   latitude: number | null;
   longitude: number | null;
@@ -335,8 +336,14 @@ export async function emitBookingMessageNew(
   }
 }
 
-export async function emitBookingMessagingClosed(bookingId: number) {
+export async function emitBookingCoordinationClosed(
+  bookingId: number,
+  reason = 'Chat and calls are no longer available for this booking.'
+) {
   if (!io) return;
+
+  const { endActiveCallsForBooking } = await import('../utils/bookingCallService');
+  await endActiveCallsForBooking(bookingId);
 
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
@@ -344,16 +351,104 @@ export async function emitBookingMessagingClosed(bookingId: number) {
   });
   if (!booking) return;
 
-  const payload = {
-    bookingId,
-    reason: 'Booking messages are unavailable after the session starts.',
-  };
+  const payload = { bookingId, reason };
 
   io.to(bookingRoom(bookingId)).emit(SOCKET_EVENTS.MESSAGING_CLOSED, payload);
+  io.to(bookingRoom(bookingId)).emit(SOCKET_EVENTS.COORDINATION_CLOSED, payload);
   io.to(userRoom(booking.clientId)).emit(SOCKET_EVENTS.MESSAGING_CLOSED, payload);
+  io.to(userRoom(booking.clientId)).emit(SOCKET_EVENTS.COORDINATION_CLOSED, payload);
   if (booking.companion.userId) {
     io.to(userRoom(booking.companion.userId)).emit(SOCKET_EVENTS.MESSAGING_CLOSED, payload);
+    io.to(userRoom(booking.companion.userId)).emit(SOCKET_EVENTS.COORDINATION_CLOSED, payload);
   }
+}
+
+/** @deprecated Use emitBookingCoordinationClosed */
+export async function emitBookingMessagingClosed(bookingId: number) {
+  await emitBookingCoordinationClosed(bookingId);
+}
+
+export async function emitBookingCoordinationOpened(bookingId: number) {
+  if (!io) return;
+
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    select: {
+      clientId: true,
+      status: true,
+      startTime: true,
+      endTime: true,
+      companion: { select: { userId: true } },
+    },
+  });
+  if (!booking) return;
+
+  const { buildCoordinationStatus } = await import('../utils/bookingCoordination');
+  const coordination = buildCoordinationStatus(booking);
+  const payload = { bookingId, ...coordination };
+
+  io.to(bookingRoom(bookingId)).emit(SOCKET_EVENTS.COORDINATION_OPENED, payload);
+  io.to(userRoom(booking.clientId)).emit(SOCKET_EVENTS.COORDINATION_OPENED, payload);
+  if (booking.companion.userId) {
+    io.to(userRoom(booking.companion.userId)).emit(SOCKET_EVENTS.COORDINATION_OPENED, payload);
+  }
+}
+
+function emitCallToBookingParticipants(
+  bookingId: number,
+  event: string,
+  payload: unknown,
+  targetUserId?: number
+) {
+  if (!io) return;
+  void prisma.booking
+    .findUnique({
+      where: { id: bookingId },
+      select: { clientId: true, companion: { select: { userId: true } } },
+    })
+    .then((booking) => {
+      if (!booking || !io) return;
+      if (targetUserId != null) {
+        io.to(userRoom(targetUserId)).emit(event, payload);
+        return;
+      }
+      io.to(bookingRoom(bookingId)).emit(event, payload);
+      io.to(userRoom(booking.clientId)).emit(event, payload);
+      if (booking.companion.userId) {
+        io.to(userRoom(booking.companion.userId)).emit(event, payload);
+      }
+    });
+}
+
+export function emitBookingCallIncoming(
+  bookingId: number,
+  call: Record<string, unknown>,
+  receiverUserId: number
+) {
+  emitCallToBookingParticipants(
+    bookingId,
+    SOCKET_EVENTS.CALL_INCOMING,
+    { bookingId, call },
+    receiverUserId
+  );
+}
+
+export function emitBookingCallState(bookingId: number, call: Record<string, unknown>) {
+  emitCallToBookingParticipants(bookingId, SOCKET_EVENTS.CALL_STATE, { bookingId, call });
+}
+
+export function emitBookingCallSignal(
+  bookingId: number,
+  targetUserId: number,
+  payload: {
+    callId: string;
+    fromUserId: number;
+    signalType: string;
+    sdp?: string;
+    candidate?: unknown;
+  }
+) {
+  emitCallToBookingParticipants(bookingId, SOCKET_EVENTS.CALL_SIGNAL, payload, targetUserId);
 }
 
 function emitTrackingToBookingParticipants(bookingId: number, event: string, payload: unknown) {

@@ -65,6 +65,8 @@ model User {
   notifications    Notification[]
   profileViews     ProfileView[]     @relation("UserViewedProfiles")
   bookingMessagesSent BookingMessage[] @relation("BookingMessagesSent")
+  callsInitiated      BookingCall[]    @relation("BookingCallsInitiated")
+  callsReceived       BookingCall[]    @relation("BookingCallsReceived")
 }
 
 model CompanionProfile {
@@ -147,18 +149,44 @@ model Booking {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  coordinationOpenNotifiedAt DateTime?
+
   client       User             @relation("ClientBookings", fields: [clientId], references: [id])
   companion    CompanionProfile @relation("CompanionBookings", fields: [companionId], references: [id])
   messages     BookingMessage[]
+  calls        BookingCall[]
+}
+
+model BookingCall {
+  id             String   @id @default(cuid())
+  bookingId      Int
+  callerUserId   Int
+  receiverUserId Int
+  roomName       String   @unique
+  status         String   @default("RINGING")
+  startedAt      DateTime?
+  answeredAt     DateTime?
+  endedAt        DateTime?
+  duration       Int?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  booking  Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  caller   User    @relation("BookingCallsInitiated", fields: [callerUserId], references: [id])
+  receiver User    @relation("BookingCallsReceived", fields: [receiverUserId], references: [id])
+
+  @@index([bookingId, createdAt])
+  @@index([bookingId, status])
 }
 
 model BookingMessage {
   id           Int      @id @default(autoincrement())
   bookingId    Int
   senderUserId Int
-  messageId    String
-  text         String
-  kind         String   @default("MAIN")
+  messageId    String?
+  text         String   @default("")
+  imageUrl     String?
+  kind         String   @default("TEXT")
   latitude     Float?
   longitude    Float?
   createdAt    DateTime @default(now())

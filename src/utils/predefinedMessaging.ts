@@ -8,6 +8,11 @@ import {
   type PredefinedMessage,
 } from './predefinedMessageCatalog';
 import { normalizeSearchInput } from './predefinedMessageNormalize';
+import {
+  buildCoordinationStatus,
+  coordinationUnavailableReason,
+  isBookingCoordinationOpen,
+} from './bookingCoordination';
 
 export {
   CATALOG_VERSION,
@@ -73,20 +78,18 @@ export function getQuickRepliesForMessageId(messageId: string): PredefinedMessag
     .filter((m): m is PredefinedMessage => m != null);
 }
 
-export function isBookingMessagingAvailable(booking: Pick<Booking, 'status'>): boolean {
-  return booking.status === 'ACCEPTED';
+export function isBookingMessagingAvailable(
+  booking: Pick<Booking, 'status' | 'startTime' | 'endTime'>,
+  nowMs?: number
+): boolean {
+  return isBookingCoordinationOpen(booking, nowMs);
 }
 
-export function messagingUnavailableReason(booking: Pick<Booking, 'status'>): string | null {
-  if (isBookingMessagingAvailable(booking)) return null;
-  if (booking.status === 'ACTIVE' || booking.status === 'COMPLETED') {
-    return 'Booking messages are unavailable after the session starts.';
-  }
-  if (booking.status === 'CANCELLED') {
-    return 'This booking was cancelled.';
-  }
-  if (booking.status !== 'ACCEPTED') {
-    return 'Messaging is available after the companion accepts the booking.';
-  }
-  return 'Messaging is not available for this booking.';
+export function messagingUnavailableReason(
+  booking: Pick<Booking, 'status' | 'startTime' | 'endTime'>,
+  nowMs?: number
+): string | null {
+  return coordinationUnavailableReason(booking, nowMs);
 }
+
+export { buildCoordinationStatus };

@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import prisma from "../../config/db";
 import { activeMomentsWhere } from "../../constants/moments";
+import { normalizeSavedLocations } from "../../utils/savedLocations";
 
 
 /**
@@ -223,6 +224,7 @@ export const specificCompanion = async (req: Request, res: Response): Promise<an
                         about: true,
                         languages: true,
                         activityType: true,
+                        savedLocations: true,
                         gallery: true,
                         galleryLayout: true,
                         intros: true
@@ -322,9 +324,11 @@ export const specificCompanion = async (req: Request, res: Response): Promise<an
             ...companionData,
             user: {
                 ...companion.user,
+                savedLocations: normalizeSavedLocations(companion.user.savedLocations),
                 gallery,
                 galleryLayout,
             },
+            savedLocations: normalizeSavedLocations(companion.user.savedLocations),
             gallery,
             galleryLayout,
             isSaved,

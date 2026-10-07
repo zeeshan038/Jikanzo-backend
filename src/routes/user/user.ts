@@ -5,6 +5,8 @@ import {
     registerUser,
     loginUser,
     updateProfile,
+    setActiveLocation,
+    getSavedLocations,
     whoami,
     checkProfileProgress,
     uploadGallery,
@@ -31,6 +33,8 @@ router.post('/test-push', testPushNotification);
 router.use(verifyUser);
 
 router.put('/update-profile', updateProfile);
+router.put('/active-location', setActiveLocation);
+router.get('/saved-locations', getSavedLocations);
 router.get('/whoami', whoami);
 router.post('/update-fcm', UpdateFcm);
 router.post('/upload-image', upload.single('image'), uploadImage);

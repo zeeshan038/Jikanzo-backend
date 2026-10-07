@@ -1,4 +1,13 @@
 import Joi from 'joi';
+import { MAX_SAVED_LOCATIONS } from '../../utils/savedLocations';
+
+const SavedLocationSchema = Joi.object({
+  lat: Joi.alternatives().try(Joi.number(), Joi.string()).required(),
+  lng: Joi.alternatives().try(Joi.number(), Joi.string()).required(),
+  name: Joi.string().allow('', null).optional(),
+  isActive: Joi.boolean().optional(),
+  isPrimary: Joi.boolean().optional(),
+});
 
 export const RegisterSchema = Joi.object({
   username: Joi.string().min(3).max(30).required(),
@@ -20,11 +29,43 @@ export const LoginSchema = Joi.object({
   otp: Joi.string().length(6).required(),
 });
 
+export const SetActiveLocationSchema = Joi.object({
+  index: Joi.number().integer().min(0).optional(),
+  lat: Joi.alternatives().try(Joi.number(), Joi.string()).optional(),
+  lng: Joi.alternatives().try(Joi.number(), Joi.string()).optional(),
+  name: Joi.string().allow('', null).optional(),
+})
+  .custom((value, helpers) => {
+    const hasIndex = value.index !== undefined;
+    const hasLat = value.lat !== undefined;
+    const hasLng = value.lng !== undefined;
+
+    if (hasIndex && (hasLat || hasLng)) {
+      return helpers.error('any.custom', {
+        message: 'Send either index or lat/lng, not both',
+      });
+    }
+    if (!hasIndex && !(hasLat && hasLng)) {
+      return helpers.error('any.custom', {
+        message: 'Send index or both lat and lng',
+      });
+    }
+    if ((hasLat && !hasLng) || (!hasLat && hasLng)) {
+      return helpers.error('any.custom', {
+        message: 'lat and lng must be sent together',
+      });
+    }
+    return value;
+  });
+
 export const UpdateProfileSchema = Joi.object({
   about: Joi.string().allow('', null).optional(),
   languages: Joi.array().items(Joi.string()).optional(),
   activityType: Joi.array().items(Joi.string()).optional(),
-  savedLocations: Joi.array().items(Joi.object()).optional(),
+  savedLocations: Joi.array()
+    .items(SavedLocationSchema)
+    .max(MAX_SAVED_LOCATIONS)
+    .optional(),
   gender: Joi.string().allow('', null).optional(),
   age: Joi.number().integer().min(0).allow(null).optional(),
   username: Joi.string().min(3).max(30).optional(),

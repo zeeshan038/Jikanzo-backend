@@ -6,6 +6,7 @@ import { emitInitialCompanionCount, emitInitialHomeBar, setSocketServer } from '
 import { SOCKET_CLIENT_EVENTS } from './constants';
 import { bookingRoom, companionRoom, userRoom } from './rooms';
 import { registerBookingTrackingHandlers } from './trackingHandlers';
+import { registerBookingCallHandlers } from './callHandlers';
 
 export function initSockets(httpServer: HttpServer): Server {
   const io = new Server(httpServer, {
@@ -63,6 +64,7 @@ export function initSockets(httpServer: HttpServer): Server {
     });
 
     registerBookingTrackingHandlers(socket);
+    registerBookingCallHandlers(socket);
   });
 
   console.log('[Socket.io] initialized');
@@ -79,5 +81,7 @@ export {
   emitBookingExtensionPrompt,
   emitBookingMessageNew,
   emitBookingMessagingClosed,
+  emitBookingCoordinationClosed,
+  emitBookingCoordinationOpened,
   refreshHomeBarForBooking,
 } from './bookingEmit';

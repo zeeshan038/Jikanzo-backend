@@ -641,17 +641,6 @@ export const startBookingController = async (req: Request, res: Response) => {
       data: { status: 'ACTIVE' }
     });
 
-    const { emitBookingMessagingClosed, endBookingTrackingAndNotify } = await import(
-      '../../sockets/bookingEmit'
-    );
-    emitBookingMessagingClosed(bookingId).catch((err) =>
-      console.error('[Socket] emitBookingMessagingClosed:', err)
-    );
-    endBookingTrackingAndNotify(
-      bookingId,
-      'Live tracking ended — session has started.'
-    ).catch((err) => console.error('[Socket] endBookingTrackingAndNotify:', err));
-
     emitBookingRequestUpdated(bookingId).catch((err) =>
       console.error('[Socket] emitBookingRequestUpdated:', err)
     );
@@ -908,6 +897,11 @@ export const cancelBookingController = async (req: Request, res: Response) => {
     const { endBookingTrackingAndNotify } = await import('../../sockets/bookingEmit');
     endBookingTrackingAndNotify(bookingId, 'Live tracking ended — booking cancelled.').catch(
       (err) => console.error('[Socket] endBookingTrackingAndNotify:', err)
+    );
+
+    const { emitBookingCoordinationClosed } = await import('../../sockets/bookingEmit');
+    emitBookingCoordinationClosed(bookingId, 'This booking was cancelled.').catch((err) =>
+      console.error('[Socket] emitBookingCoordinationClosed:', err)
     );
 
     return res.status(200).json({

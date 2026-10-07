@@ -659,7 +659,11 @@ Full HTTP + rules: **`docs/BOOKING_MESSAGING.md`**.
 | Event | When |
 |-------|------|
 | `booking:message:new` | After `POST /api/messaging/:id` — payload `{ bookingId, message }` |
-| `booking:messaging:closed` | After session start (`POST /api/booking/start/:id`) — disable send UI |
+| `booking:messaging:closed` | Coordination window ended — disable send UI |
+| `booking:coordination:opened` | ~30 min before `startTime` — chat/calls enabled |
+| `booking:coordination:closed` | Same as messaging closed |
+
+Voice calling sockets: **`docs/BOOKING_CALLING.md`** (`booking:call:incoming`, `booking:call:state`, `booking:call:signal`).
 
 Use `booking:subscribe` on the messages screen so both parties receive `booking:message:new`.
 

@@ -9,7 +9,12 @@ export type PredefinedMessage = {
   aliases: string[];
 };
 
-export type BookingMessageKind = 'MAIN' | 'QUICK_REPLY' | 'LOCATION_SHARED';
+export type BookingMessageKind =
+  | 'MAIN'
+  | 'QUICK_REPLY'
+  | 'LOCATION_SHARED'
+  | 'TEXT'
+  | 'IMAGE';
 
 function msg(
   id: string,

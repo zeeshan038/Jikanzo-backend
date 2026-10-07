@@ -37,14 +37,23 @@
                         "type": "integer"
                     },
                     "messageId": {
-                        "type": "string"
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Catalog id for legacy predefined messages; null for free chat"
                     },
                     "text": {
                         "type": "string"
                     },
+                    "imageUrl": {
+                        "type": "string",
+                        "nullable": true
+                    },
                     "kind": {
                         "type": "string",
                         "enum": [
+                            "TEXT",
+                            "IMAGE",
+                            "CALL",
                             "MAIN",
                             "QUICK_REPLY",
                             "LOCATION_SHARED"
@@ -61,6 +70,104 @@
                     "createdAt": {
                         "type": "string",
                         "format": "date-time"
+                    }
+                }
+            },
+            "BookingCall": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "bookingId": {
+                        "type": "integer"
+                    },
+                    "callerUserId": {
+                        "type": "integer"
+                    },
+                    "receiverUserId": {
+                        "type": "integer"
+                    },
+                    "roomName": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "RINGING",
+                            "ACCEPTED",
+                            "REJECTED",
+                            "MISSED",
+                            "ENDED",
+                            "FAILED"
+                        ]
+                    },
+                    "startedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "answeredAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "endedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "duration": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                }
+            },
+            "CoordinationStatus": {
+                "type": "object",
+                "properties": {
+                    "available": {
+                        "type": "boolean"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "opensAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "closesAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                }
+            },
+            "IceServer": {
+                "type": "object",
+                "properties": {
+                    "urls": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            }
+                        ]
+                    },
+                    "username": {
+                        "type": "string"
+                    },
+                    "credential": {
+                        "type": "string"
                     }
                 }
             },
@@ -721,11 +828,17 @@
                     },
                     "locationLat": {
                         "type": "number",
-                        "example": 33.5650275
+                        "example": 33.5650275,
+                        "description": "Active location latitude (same as activeLocation.lat)."
                     },
                     "locationLng": {
                         "type": "number",
-                        "example": 73.1522898
+                        "example": 73.1522898,
+                        "description": "Active location longitude (same as activeLocation.lng)."
+                    },
+                    "activeLocation": {
+                        "$ref": "#/components/schemas/SavedLocation",
+                        "description": "Currently active saved location used for discover distance and map pin."
                     },
                     "serviceRadius": {
                         "type": "integer",
@@ -1165,8 +1278,26 @@
                     },
                     "savedLocations": {
                         "type": "array",
+                        "maxItems": 20,
+                        "description": "All saved places with isActive flags (normalized on read). Exactly one entry has isActive: true when the list is non-empty.",
                         "items": {
-                            "type": "object"
+                            "$ref": "#/components/schemas/SavedLocation"
+                        }
+                    },
+                    "activeLocation": {
+                        "type": "object",
+                        "nullable": true,
+                        "description": "Convenience copy of the active saved location (discover / map pin). Null when no locations are saved.",
+                        "properties": {
+                            "lat": {
+                                "type": "number"
+                            },
+                            "lng": {
+                                "type": "number"
+                            },
+                            "name": {
+                                "type": "string"
+                            }
                         }
                     },
                     "gender": {
@@ -1215,6 +1346,20 @@
                         "properties": {
                             "id": {
                                 "type": "integer"
+                            },
+                            "locationLat": {
+                                "type": "number",
+                                "nullable": true,
+                                "description": "Mirrors active saved location lat after update-profile."
+                            },
+                            "locationLng": {
+                                "type": "number",
+                                "nullable": true,
+                                "description": "Mirrors active saved location lng after update-profile."
+                            },
+                            "serviceRadius": {
+                                "type": "integer",
+                                "nullable": true
                             }
                         }
                     },
@@ -1258,7 +1403,25 @@
                             "Dinner",
                             "City Tour"
                         ],
-                        "savedLocations": [],
+                        "savedLocations": [
+                            {
+                                "name": "Tokyo Tower",
+                                "lat": 35.6586,
+                                "lng": 139.7454,
+                                "isActive": true
+                            },
+                            {
+                                "name": "Shibuya Crossing",
+                                "lat": 35.6595,
+                                "lng": 139.7001,
+                                "isActive": false
+                            }
+                        ],
+                        "activeLocation": {
+                            "name": "Tokyo Tower",
+                            "lat": 35.6586,
+                            "lng": 139.7454
+                        },
                         "gender": "Female",
                         "age": 24,
                         "walletBalance": 0,
@@ -1269,9 +1432,213 @@
                         "galleryLayout": "2",
                         "intros": [],
                         "companionProfile": {
-                            "id": 12
+                            "id": 12,
+                            "locationLat": 35.6586,
+                            "locationLng": 139.7454,
+                            "serviceRadius": 10
                         },
                         "profileProgress": 100
+                    }
+                }
+            },
+            "SavedLocation": {
+                "type": "object",
+                "required": [
+                    "lat",
+                    "lng"
+                ],
+                "properties": {
+                    "lat": {
+                        "type": "number",
+                        "description": "Latitude (-90 to 90). Strings are coerced on save."
+                    },
+                    "lng": {
+                        "type": "number",
+                        "description": "Longitude (-180 to 180). Strings are coerced on save."
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Optional label (city, venue, etc.)"
+                    },
+                    "isActive": {
+                        "type": "boolean",
+                        "description": "Mark the location currently shown on discover and the feed map. Exactly one entry in the array should be true; if none are set, the first item becomes active on save."
+                    },
+                    "isPrimary": {
+                        "type": "boolean",
+                        "deprecated": true,
+                        "description": "Legacy alias for isActive when no entry has isActive set."
+                    }
+                }
+            },
+            "SetActiveLocationRequest": {
+                "type": "object",
+                "description": "Send **either** index **or** lat+lng (not both). Coordinates update the currently active saved place (or create the first entry). Index switches which saved place is active.",
+                "properties": {
+                    "index": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "0-based index into savedLocations"
+                    },
+                    "lat": {
+                        "type": "number",
+                        "description": "Current latitude (with lng)"
+                    },
+                    "lng": {
+                        "type": "number",
+                        "description": "Current longitude (with lat)"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Optional label when updating lat/lng"
+                    }
+                },
+                "examples": {
+                    "gpsFix": {
+                        "summary": "Update current GPS / map pin",
+                        "value": {
+                            "lat": 34.1269515,
+                            "lng": 72.4741399,
+                            "name": "Swabi, Pakistan"
+                        }
+                    },
+                    "pickSaved": {
+                        "summary": "Activate an existing saved place",
+                        "value": {
+                            "index": 1
+                        }
+                    }
+                }
+            },
+            "SetActiveLocationResponse": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "msg": {
+                        "type": "string",
+                        "example": "Active location updated successfully"
+                    },
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "savedLocations": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/SavedLocation"
+                                }
+                            },
+                            "activeLocation": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                    "lat": {
+                                        "type": "number"
+                                    },
+                                    "lng": {
+                                        "type": "number"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "SavedLocationListItem": {
+                "type": "object",
+                "properties": {
+                    "index": {
+                        "type": "integer",
+                        "description": "Use with PUT /user/active-location { index } or when mapping booking meetup fields."
+                    },
+                    "lat": {
+                        "type": "number"
+                    },
+                    "lng": {
+                        "type": "number"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "isActive": {
+                        "type": "boolean"
+                    }
+                }
+            },
+            "GetSavedLocationsResponse": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "msg": {
+                        "type": "string",
+                        "example": "Saved locations fetched successfully"
+                    },
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "savedLocations": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/SavedLocationListItem"
+                                }
+                            },
+                            "activeIndex": {
+                                "type": "integer",
+                                "nullable": true,
+                                "description": "Index of the currently active location, or null if none."
+                            },
+                            "activeLocation": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                    "lat": {
+                                        "type": "number"
+                                    },
+                                    "lng": {
+                                        "type": "number"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "example": {
+                    "status": true,
+                    "msg": "Saved locations fetched successfully",
+                    "data": {
+                        "savedLocations": [
+                            {
+                                "index": 0,
+                                "lat": 35.6586,
+                                "lng": 139.7454,
+                                "name": "Tokyo Tower",
+                                "isActive": true
+                            },
+                            {
+                                "index": 1,
+                                "lat": 35.6595,
+                                "lng": 139.7001,
+                                "name": "Shibuya Crossing",
+                                "isActive": false
+                            }
+                        ],
+                        "activeIndex": 0,
+                        "activeLocation": {
+                            "lat": 35.6586,
+                            "lng": 139.7454,
+                            "name": "Tokyo Tower"
+                        }
                     }
                 }
             },
@@ -1295,8 +1662,10 @@
                     },
                     "savedLocations": {
                         "type": "array",
+                        "maxItems": 20,
+                        "description": "Full list of saved places (replace semantics: send every location you want to keep). Set isActive: true on exactly one entry for discover / map pin; server normalizes flags and syncs the active point to CompanionProfile.locationLat/Lng.",
                         "items": {
-                            "type": "object"
+                            "$ref": "#/components/schemas/SavedLocation"
                         }
                     },
                     "gender": {
@@ -1368,12 +1737,14 @@
                         {
                             "name": "Tokyo Tower",
                             "lat": 35.6586,
-                            "lng": 139.7454
+                            "lng": 139.7454,
+                            "isActive": true
                         },
                         {
                             "name": "Shibuya Crossing",
                             "lat": 35.6595,
-                            "lng": 139.7001
+                            "lng": 139.7001,
+                            "isActive": false
                         }
                     ],
                     "gender": "Female",
@@ -2507,7 +2878,7 @@
                     "User"
                 ],
                 "summary": "Discover people near you",
-                "description": "Returns all companions with a stored location, sorted nearest-first by distance from lat/lng (no radius filter). Uses CompanionProfile.locationLat/locationLng (synced from the first saved location on profile update).",
+                "description": "Returns companions with a stored location, sorted nearest-first by distance from lat/lng (no radius filter). Distance and map pin use the companion's **active** saved location (isActive: true on User.savedLocations), mirrored to CompanionProfile.locationLat/Lng on profile update.",
                 "security": [
                     {
                         "bearerAuth": []
@@ -2875,6 +3246,13 @@
                                                     ],
                                                     "description": "Gallery UI template (same as whoami / upload-gallery)"
                                                 },
+                                                "savedLocations": {
+                                                    "type": "array",
+                                                    "description": "All saved service areas for this companion (same as user.savedLocations)",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/SavedLocation"
+                                                    }
+                                                },
                                                 "user": {
                                                     "type": "object",
                                                     "properties": {
@@ -2909,6 +3287,12 @@
                                                             "type": "array",
                                                             "items": {
                                                                 "type": "string"
+                                                            }
+                                                        },
+                                                        "savedLocations": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/components/schemas/SavedLocation"
                                                             }
                                                         },
                                                         "gallery": {
@@ -3152,6 +3536,7 @@
                     "User"
                 ],
                 "summary": "Update user profile",
+                "description": "Partial update for profile fields. **savedLocations**: send the complete array (up to 20). Each item requires lat/lng; optional name and **isActive** (one entry true = discover / feed map pin). Omitted isActive flags are normalized on save (first item active if none marked).",
                 "security": [
                     {
                         "bearerAuth": []
@@ -3202,13 +3587,79 @@
                 }
             }
         },
+        "/user/active-location": {
+            "put": {
+                "tags": [
+                    "User"
+                ],
+                "summary": "Set active location (GPS fix or saved index)",
+                "description": "Lightweight alternative to update-profile for location only. Updates discover/feed pin and syncs CompanionProfile.locationLat/Lng. Use lat/lng to fix current position; use index to switch among saved places.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SetActiveLocationRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Active location updated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SetActiveLocationResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error or invalid index",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/user/whoami": {
             "get": {
                 "tags": [
                     "User"
                 ],
                 "summary": "Get current logged in user details",
-                "description": "Returns the authenticated user profile including **gallery** (all uploaded image URLs) and **galleryLayout** (\"1\", \"2\", or \"3\") set via POST /user/upload-gallery or update-profile.",
+                "description": "Returns the authenticated user profile including **savedLocations** (each with **isActive**), **activeLocation** (discover/map pin), **gallery**, **galleryLayout**, and companion **locationLat/Lng** when applicable.",
                 "security": [
                     {
                         "bearerAuth": []
@@ -3250,6 +3701,9 @@
         },
         "/api/user/whoami": {
             "$ref": "#/paths/~1user~1whoami"
+        },
+        "/api/user/active-location": {
+            "$ref": "#/paths/~1user~1active-location"
         },
         "/api/user/upload-gallery": {
             "$ref": "#/paths/~1user~1upload-gallery"
@@ -3824,8 +4278,8 @@
                 "tags": [
                     "Messaging"
                 ],
-                "summary": "Send predefined booking message",
-                "description": "Send only an approved messageId. Free text is rejected. Requires ACCEPTED until session starts.",
+                "summary": "Send booking chat message",
+                "description": "Free-form chat: send `text`, `imageUrl`, and/or location (`latitude` + `longitude`). Optional caption on images. Legacy predefined flow: send catalog `messageId` only (no free text/image). Messaging open while booking status is ACCEPTED.",
                 "security": [
                     {
                         "bearerAuth": []
@@ -3847,12 +4301,18 @@
                         "application/json": {
                             "schema": {
                                 "type": "object",
-                                "required": [
-                                    "messageId"
-                                ],
                                 "properties": {
+                                    "text": {
+                                        "type": "string",
+                                        "maxLength": 4000
+                                    },
+                                    "imageUrl": {
+                                        "type": "string",
+                                        "description": "CDN URL from upload-image endpoints"
+                                    },
                                     "messageId": {
-                                        "type": "string"
+                                        "type": "string",
+                                        "description": "Legacy predefined catalog id"
                                     },
                                     "latitude": {
                                         "type": "number"
@@ -3915,6 +4375,81 @@
                 }
             }
         },
+        "/messaging/{id}/upload-image": {
+            "post": {
+                "tags": [
+                    "Messaging"
+                ],
+                "summary": "Upload chat image for a booking",
+                "description": "Multipart field `image`. Returns CDN `imageUrl` to send via POST /messaging/{id}. Requires ACCEPTED booking.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "image"
+                                ],
+                                "properties": {
+                                    "image": {
+                                        "type": "string",
+                                        "format": "binary"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Uploaded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "msg": {
+                                            "type": "string"
+                                        },
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "imageUrl": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Messaging closed"
+                    }
+                }
+            }
+        },
         "/messaging/{id}/status": {
             "get": {
                 "tags": [
@@ -3948,13 +4483,116 @@
                                             "type": "boolean"
                                         },
                                         "data": {
+                                            "$ref": "#/components/schemas/CoordinationStatus"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/calling/{id}/status": {
+            "get": {
+                "tags": [
+                    "Calling"
+                ],
+                "summary": "Voice calling availability",
+                "description": "Same coordination window as booking chat (30 min before start until endTime).",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Status",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/components/schemas/CoordinationStatus"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "activeCall": {
+                                                            "$ref": "#/components/schemas/BookingCall",
+                                                            "nullable": true
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/calling/{id}/config": {
+            "get": {
+                "tags": [
+                    "Calling"
+                ],
+                "summary": "WebRTC ICE servers",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "ICE config",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
                                             "type": "object",
                                             "properties": {
-                                                "available": {
-                                                    "type": "boolean"
+                                                "iceServers": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/IceServer"
+                                                    }
                                                 },
-                                                "reason": {
-                                                    "type": "string",
+                                                "activeCall": {
+                                                    "$ref": "#/components/schemas/BookingCall",
                                                     "nullable": true
                                                 }
                                             }
@@ -3963,6 +4601,174 @@
                                 }
                             }
                         }
+                    }
+                }
+            }
+        },
+        "/calling/{id}/calls": {
+            "post": {
+                "tags": [
+                    "Calling"
+                ],
+                "summary": "Start a voice call",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Call ringing",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "call": {
+                                                    "$ref": "#/components/schemas/BookingCall"
+                                                },
+                                                "iceServers": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/IceServer"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Calling closed"
+                    },
+                    "409": {
+                        "description": "Call already in progress"
+                    }
+                }
+            }
+        },
+        "/calling/{id}/calls/{callId}/accept": {
+            "post": {
+                "tags": [
+                    "Calling"
+                ],
+                "summary": "Accept incoming call",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "callId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Accepted"
+                    }
+                }
+            }
+        },
+        "/calling/{id}/calls/{callId}/reject": {
+            "post": {
+                "tags": [
+                    "Calling"
+                ],
+                "summary": "Reject incoming call",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "callId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Rejected"
+                    }
+                }
+            }
+        },
+        "/calling/{id}/calls/{callId}/end": {
+            "post": {
+                "tags": [
+                    "Calling"
+                ],
+                "summary": "End active or ringing call",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "callId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Ended"
                     }
                 }
             }

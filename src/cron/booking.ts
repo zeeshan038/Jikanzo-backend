@@ -11,7 +11,8 @@ import { EXTENSION_PROMPT_TYPES } from '../sockets/constants';
 import type { ExtensionPromptType } from '../sockets/bookingEmit';
 import { sendPushNotification } from '../utils/notification';
 import { refreshAllActiveHomeBars } from './homeBar';
-import { refreshHomeBarForBooking } from '../sockets/bookingEmit';
+import { emitBookingCoordinationClosed, refreshHomeBarForBooking } from '../sockets/bookingEmit';
+import { runCoordinationCronTasks } from './coordination';
 
 /** Match bookings whose startTime is ~N minutes from now (1-minute cron tick). */
 const CRON_MATCH_WINDOW_MS = 60 * 1000;
@@ -161,6 +162,10 @@ async function autoCompleteActiveBookingsPastEndTime() {
     emitBookingRequestUpdated(booking.id).catch((err) =>
       console.error('[CRON] Socket emit completed:', err)
     );
+    emitBookingCoordinationClosed(
+      booking.id,
+      'This booking has ended.'
+    ).catch((err) => console.error('[CRON] coordination closed:', err));
     refreshHomeBarForBooking(booking.id).catch((err) =>
       console.error('[CRON] refreshHomeBarForBooking:', err)
     );
@@ -193,5 +198,11 @@ cron.schedule('* * * * *', async () => {
     await refreshAllActiveHomeBars();
   } catch (error) {
     console.error('[CRON] Error refreshing home booking bars:', error);
+  }
+
+  try {
+    await runCoordinationCronTasks();
+  } catch (error) {
+    console.error('[CRON] Error running coordination tasks:', error);
   }
 });

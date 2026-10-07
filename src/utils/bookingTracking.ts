@@ -1,5 +1,9 @@
 import type { Booking, CompanionProfile } from '@prisma/client';
 import prisma from '../config/db';
+import {
+  coordinationUnavailableReason,
+  isBookingCoordinationOpen,
+} from './bookingCoordination';
 import { calculateDistance } from './methods';
 
 export type TrackingRole = 'client' | 'companion';
@@ -13,22 +17,19 @@ const MIN_UPDATE_INTERVAL_MS = 3000;
 
 const lastUpdateByKey = new Map<string, number>();
 
-export function isLiveTrackingAllowed(booking: Pick<Booking, 'status'>): boolean {
-  return booking.status === 'ACCEPTED';
+export function isLiveTrackingAllowed(
+  booking: Pick<Booking, 'status' | 'startTime' | 'endTime'>,
+  nowMs?: number
+): boolean {
+  return isBookingCoordinationOpen(booking, nowMs);
 }
 
-export function liveTrackingBlockedReason(booking: Pick<Booking, 'status'>): string | null {
-  if (isLiveTrackingAllowed(booking)) return null;
-  if (booking.status === 'ACTIVE' || booking.status === 'COMPLETED') {
-    return 'Live tracking ended — session in progress or completed.';
-  }
-  if (booking.status === 'CANCELLED') {
-    return 'Live tracking is not available for cancelled bookings.';
-  }
-  if (booking.status !== 'ACCEPTED') {
-    return 'Live tracking is available after the companion accepts the booking.';
-  }
-  return 'Live tracking is not available for this booking.';
+export function liveTrackingBlockedReason(
+  booking: Pick<Booking, 'status' | 'startTime' | 'endTime'>,
+  nowMs?: number
+): string | null {
+  if (isLiveTrackingAllowed(booking, nowMs)) return null;
+  return coordinationUnavailableReason(booking, nowMs) ?? 'Live tracking is not available.';
 }
 
 export function resolveTrackingRole(
