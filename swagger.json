@@ -2782,6 +2782,11 @@
                                             "format": "uri"
                                         },
                                         "minItems": 1
+                                    },
+                                    "isCompanion": {
+                                        "type": "boolean",
+                                        "default": false,
+                                        "description": "If true, updates the companion gallery instead of client gallery"
                                     }
                                 },
                                 "required": [
@@ -3587,6 +3592,52 @@
                 }
             }
         },
+        "/user/saved-locations": {
+            "get": {
+                "tags": [
+                    "User"
+                ],
+                "summary": "List saved locations (booking picker)",
+                "description": "Returns the authenticated user's saved places with **index**, **isActive**, and **activeLocation**. Use selected lat/lng/name on POST /booking/book-companion/:id as **latitude**, **longitude**, and **address** (name).",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Saved locations fetched",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetSavedLocationsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/user/active-location": {
             "put": {
                 "tags": [
@@ -3704,6 +3755,9 @@
         },
         "/api/user/active-location": {
             "$ref": "#/paths/~1user~1active-location"
+        },
+        "/api/user/saved-locations": {
+            "$ref": "#/paths/~1user~1saved-locations"
         },
         "/api/user/upload-gallery": {
             "$ref": "#/paths/~1user~1upload-gallery"
