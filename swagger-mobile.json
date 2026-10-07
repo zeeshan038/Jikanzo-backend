@@ -1942,6 +1942,171 @@
             ]
           }
         }
+      },
+      "SetCompanionActivitiesInput": {
+        "type": "object",
+        "properties": {
+          "activities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "activityId": {
+                  "type": "integer"
+                },
+                "price": {
+                  "type": "number"
+                },
+                "isActive": {
+                  "type": "boolean"
+                },
+                "subActivityIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "ActivityModel": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "example": "Coffee Meetups"
+          },
+          "description": {
+            "type": "string",
+            "example": "Relaxing coffee meetup"
+          },
+          "image": {
+            "type": "string",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "example": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SubActivityModel": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "activityId": {
+            "type": "integer",
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "example": "Coffee Cafe"
+          },
+          "description": {
+            "type": "string",
+            "example": "Coffee Cafe"
+          },
+          "isActive": {
+            "type": "boolean",
+            "example": true
+          }
+        }
+      },
+      "ActivityWithSubActivitiesModel": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ActivityModel"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "subActivities": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SubActivityModel"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "CompanionActivityModel": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "companionId": {
+            "type": "integer",
+            "example": 2
+          },
+          "activityId": {
+            "type": "integer",
+            "example": 1
+          },
+          "price": {
+            "type": "number",
+            "example": 1500
+          },
+          "isActive": {
+            "type": "boolean",
+            "example": true
+          },
+          "activity": {
+            "$ref": "#/components/schemas/ActivityModel"
+          },
+          "subActivities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "companionActivityId": {
+                  "type": "integer"
+                },
+                "subActivityId": {
+                  "type": "integer"
+                },
+                "subActivity": {
+                  "$ref": "#/components/schemas/SubActivityModel"
+                }
+              }
+            }
+          }
+        }
+      },
+      "BaseErrorResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "boolean",
+            "example": false
+          },
+          "msg": {
+            "type": "string",
+            "example": "Server error or specific error message"
+          }
+        }
       }
     }
   },
@@ -7796,7 +7961,7 @@
                         },
                         "momentsAnalytics": {
                           "type": "object",
-                          "description": "Same shape as GET /feed/specific/:userId \u2014 overlay stats (views, hearts, rings, diamonds)",
+                          "description": "Same shape as GET /feed/specific/:userId — overlay stats (views, hearts, rings, diamonds)",
                           "properties": {
                             "totalViews": {
                               "type": "integer",
@@ -8743,7 +8908,7 @@
           "User"
         ],
         "summary": "Send test push notification (public)",
-        "description": "Testing only \u2014 no authentication. Sends FCM to the given device token. If userId is provided, saves the token on that user and creates an in-app notification record.",
+        "description": "Testing only — no authentication. Sends FCM to the given device token. If userId is provided, saves the token on that user and creates an in-app notification record.",
         "requestBody": {
           "required": true,
           "content": {
@@ -8840,6 +9005,191 @@
                       "type": "object"
                     }
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companion/activity/available": {
+      "get": {
+        "tags": [
+          "Companion Profile"
+        ],
+        "summary": "Get available activities",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Available activities fetched successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "msg": {
+                      "type": "string",
+                      "example": "Available activities fetched successfully"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ActivityWithSubActivitiesModel"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companion/activity": {
+      "get": {
+        "tags": [
+          "Companion Profile"
+        ],
+        "summary": "Get companion's selected activities",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Companion activities fetched successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "msg": {
+                      "type": "string",
+                      "example": "Companion activities fetched successfully"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CompanionActivityModel"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Companion Profile"
+        ],
+        "summary": "Update companion activities",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetCompanionActivitiesInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Activities updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "msg": {
+                      "type": "string",
+                      "example": "Activities updated successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseErrorResponse"
                 }
               }
             }

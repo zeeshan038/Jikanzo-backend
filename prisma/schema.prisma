@@ -110,6 +110,7 @@ model CompanionProfile {
   oneTimeAvailabilities OneTimeAvailability[]
   blockedDates        BlockedDate[]
   recentViews         ProfileView[] @relation("CompanionProfileViews")
+  activities          CompanionActivity[]
 }
 
 model Booking {
@@ -346,4 +347,52 @@ model BlockedDate {
   reason      String?  // e.g., "Vacation"
 
   companion   CompanionProfile @relation(fields: [companionId], references: [id])
+}
+
+model Activity {
+  id            Int           @id @default(autoincrement())
+  name          String        @unique
+  description   String?
+  image         String?
+  isActive      Boolean       @default(true)
+  subActivities SubActivity[]
+  companionActivities CompanionActivity[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model SubActivity {
+  id            Int      @id @default(autoincrement())
+  activityId    Int
+  name          String
+  description   String?
+  isActive      Boolean  @default(true)
+  
+  activity      Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  companionSubActivities CompanionSubActivity[]
+}
+
+model CompanionActivity {
+  id            Int      @id @default(autoincrement())
+  companionId   Int
+  activityId    Int
+  price         Float    @default(0)
+  isActive      Boolean  @default(true)
+  
+  companion     CompanionProfile @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  activity      Activity         @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  subActivities CompanionSubActivity[]
+  
+  @@unique([companionId, activityId])
+}
+
+model CompanionSubActivity {
+  id                  Int      @id @default(autoincrement())
+  companionActivityId Int
+  subActivityId       Int
+  
+  companionActivity   CompanionActivity @relation(fields: [companionActivityId], references: [id], onDelete: Cascade)
+  subActivity         SubActivity       @relation(fields: [subActivityId], references: [id], onDelete: Cascade)
+  
+  @@unique([companionActivityId, subActivityId])
 }
