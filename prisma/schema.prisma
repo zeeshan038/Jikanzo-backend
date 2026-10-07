@@ -82,6 +82,11 @@ model CompanionProfile {
   bookingBufferMin Int   @default(60) // e.g., 30, 60, 90, 120
   isPaused       Boolean  @default(false)
 
+  // Images for Companion
+  profileImage   String?  @default("")
+  gallery        String[] @default([])
+  galleryLayout  String   @default("1") // Profile gallery template: "1", "2", or "3"
+
   // UI Specific Fields
   isOnline       Boolean  @default(false)
   walletBalance  Float    @default(0.0)

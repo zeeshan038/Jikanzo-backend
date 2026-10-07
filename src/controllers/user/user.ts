@@ -418,11 +418,17 @@ export const updateProfile = async (req: Request, res: Response): Promise<any> =
             updateData.galleryLayout = normalizeGalleryLayout(payload.galleryLayout);
         }
 
-        if (payload.serviceRadius !== undefined) {
+        const companionUpdate: any = {};
+        if (payload.serviceRadius !== undefined) companionUpdate.serviceRadius = payload.serviceRadius;
+        if (payload.companionProfileImage !== undefined) companionUpdate.profileImage = payload.companionProfileImage;
+        if (payload.companionGallery !== undefined) companionUpdate.gallery = payload.companionGallery;
+        if (payload.companionGalleryLayout !== undefined) {
+            companionUpdate.galleryLayout = normalizeGalleryLayout(payload.companionGalleryLayout);
+        }
+
+        if (Object.keys(companionUpdate).length > 0) {
             updateData.companionProfile = {
-                update: {
-                    serviceRadius: payload.serviceRadius
-                }
+                update: companionUpdate
             };
         }
 
@@ -610,6 +616,9 @@ export const whoami = async (req: Request, res: Response): Promise<any> => {
                         locationLat: true,
                         locationLng: true,
                         serviceRadius: true,
+                        profileImage: true,
+                        gallery: true,
+                        galleryLayout: true,
                     }
                 }
             }
@@ -787,17 +796,40 @@ export const uploadGallery = async (req: Request, res: Response): Promise<any> =
     }
 
     try {
-        const { images } = validation.value;
+        const { images, isCompanion } = validation.value;
         const galleryLayout = normalizeGalleryLayout(validation.value.galleryLayout);
 
-        const updated = await prisma.user.update({
-            where: { id: userId },
-            data: {
-                galleryLayout,
-                gallery: {
-                    push: images,
+        if (isCompanion) {
+            const updated = await prisma.companionProfile.update({
+                where: { userId },
+                data: {
+                    galleryLayout,
+                    gallery: {
+                        push: images,
+                    },
                 },
-            },
+                select: {
+                    gallery: true,
+                    galleryLayout: true,
+                },
+            });
+
+            return res.status(200).json({
+                status: true,
+                msg: "Companion gallery updated successfully",
+                galleryLayout: updated.galleryLayout,
+                urls: images,
+                gallery: updated.gallery,
+            });
+        } else {
+            const updated = await prisma.user.update({
+                where: { id: userId },
+                data: {
+                    galleryLayout,
+                    gallery: {
+                        push: images,
+                    },
+                },
             select: {
                 gallery: true,
                 galleryLayout: true,
@@ -811,6 +843,7 @@ export const uploadGallery = async (req: Request, res: Response): Promise<any> =
             urls: images,
             gallery: updated.gallery,
         });
+        }
     } catch (error: any) {
         return res.status(500).json({
             status: false,

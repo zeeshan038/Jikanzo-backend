@@ -76,6 +76,11 @@ export const UpdateProfileSchema = Joi.object({
   galleryLayout: Joi.alternatives()
     .try(Joi.string().valid('1', '2', '3'), Joi.number().valid(1, 2, 3))
     .optional(),
+  companionProfileImage: Joi.string().uri().allow('', null).optional(),
+  companionGallery: Joi.array().items(Joi.string().uri().allow('', null)).optional(),
+  companionGalleryLayout: Joi.alternatives()
+    .try(Joi.string().valid('1', '2', '3'), Joi.number().valid(1, 2, 3))
+    .optional(),
 });
 
 export const UploadGallerySchema = Joi.object({
@@ -83,6 +88,7 @@ export const UploadGallerySchema = Joi.object({
     .try(Joi.string().valid('1', '2', '3'), Joi.number().valid(1, 2, 3))
     .required(),
   images: Joi.array().items(Joi.string().uri()).min(1).required(),
+  isCompanion: Joi.boolean().optional().default(false),
 });
 
 export function normalizeGalleryLayout(value: string | number): '1' | '2' | '3' {
@@ -96,4 +102,5 @@ export const DeleteMediaSchema = Joi.object({
   scope: Joi.string()
     .valid('auto', 'gallery', 'profile', 'intro')
     .default('auto'),
+  isCompanion: Joi.boolean().optional().default(false),
 });

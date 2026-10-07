@@ -109,7 +109,7 @@ export const deleteMedia = async (req: Request, res: Response) => {
         return res.status(400).json({ status: false, msg: errors });
     }
 
-    const { url, scope } = validation.value as { url: string; scope: string };
+    const { url, scope, isCompanion } = validation.value as { url: string; scope: string; isCompanion: boolean };
 
     if (!publicUrlToObjectKey(url)) {
         return res.status(400).json({
@@ -125,7 +125,7 @@ export const deleteMedia = async (req: Request, res: Response) => {
                 profileImage: true,
                 gallery: true,
                 intros: true,
-                companionProfile: { select: { id: true } },
+                companionProfile: { select: { id: true, profileImage: true, gallery: true } },
             },
         });
 
@@ -151,8 +151,8 @@ export const deleteMedia = async (req: Request, res: Response) => {
         }
 
         const removedFrom: string[] = [];
-        let nextGallery = [...user.gallery];
-        let nextProfileImage = user.profileImage;
+        let nextGallery = isCompanion && user.companionProfile ? [...user.companionProfile.gallery] : [...user.gallery];
+        let nextProfileImage = isCompanion && user.companionProfile ? user.companionProfile.profileImage : user.profileImage;
         let nextIntros = [...user.intros];
 
         const touchGallery =
@@ -161,7 +161,7 @@ export const deleteMedia = async (req: Request, res: Response) => {
                 : false;
         const touchProfile =
             scope === 'auto' || scope === 'profile'
-                ? user.profileImage != null && urlEquals(user.profileImage, url)
+                ? (isCompanion && user.companionProfile ? user.companionProfile.profileImage != null && urlEquals(user.companionProfile.profileImage, url) : user.profileImage != null && urlEquals(user.profileImage, url))
                 : false;
         const touchIntro =
             scope === 'auto' || scope === 'intro'
@@ -206,19 +206,24 @@ export const deleteMedia = async (req: Request, res: Response) => {
             removedFrom.push('intro');
         }
 
-        const updated = await prisma.user.update({
-            where: { id: userId },
-            data: {
-                gallery: nextGallery,
-                profileImage: nextProfileImage,
-                intros: nextIntros,
-            },
-            select: {
-                profileImage: true,
-                gallery: true,
-                intros: true,
-            },
-        });
+        if (isCompanion && user.companionProfile) {
+            await prisma.companionProfile.update({
+                where: { userId },
+                data: {
+                    gallery: nextGallery,
+                    profileImage: nextProfileImage,
+                },
+            });
+        } else {
+            await prisma.user.update({
+                where: { id: userId },
+                data: {
+                    gallery: nextGallery,
+                    profileImage: nextProfileImage,
+                    intros: nextIntros,
+                },
+            });
+        }
 
         let storageDeleted = true;
         try {
@@ -235,9 +240,9 @@ export const deleteMedia = async (req: Request, res: Response) => {
                 : 'Media removed from profile; storage delete failed (file may remain in bucket)',
             removedFrom,
             storageDeleted,
-            profileImage: updated.profileImage,
-            gallery: updated.gallery,
-            intros: updated.intros,
+            profileImage: nextProfileImage,
+            gallery: nextGallery,
+            intros: nextIntros,
         });
     } catch (error: any) {
         return res.status(500).json({
