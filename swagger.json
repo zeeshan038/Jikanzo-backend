@@ -1177,6 +1177,11 @@
                         ],
                         "default": "auto",
                         "description": "auto removes from any profile field that contains this URL"
+                    },
+                    "isCompanion": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "If true, deletes from companion profile/gallery"
                     }
                 },
                 "example": {
@@ -1360,6 +1365,19 @@
                             "serviceRadius": {
                                 "type": "integer",
                                 "nullable": true
+                            },
+                            "profileImage": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "gallery": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "galleryLayout": {
+                                "type": "string"
                             }
                         }
                     },
@@ -1435,7 +1453,12 @@
                             "id": 12,
                             "locationLat": 35.6586,
                             "locationLng": 139.7454,
-                            "serviceRadius": 10
+                            "serviceRadius": 10,
+                            "profileImage": "https://cdn.jikanzo.com/users/jane_companion_profile.jpg",
+                            "gallery": [
+                                "https://cdn.jikanzo.com/users/jane_comp_gallery_1.jpg"
+                            ],
+                            "galleryLayout": "1"
                         },
                         "profileProgress": 100
                     }
@@ -1720,6 +1743,28 @@
                     },
                     "serviceRadius": {
                         "type": "integer"
+                    },
+                    "companionProfileImage": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "Companion profile image URL"
+                    },
+                    "companionGallery": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "format": "uri"
+                        },
+                        "description": "Companion gallery URLs"
+                    },
+                    "companionGalleryLayout": {
+                        "type": "string",
+                        "enum": [
+                            "1",
+                            "2",
+                            "3"
+                        ],
+                        "description": "Companion gallery layout template"
                     }
                 },
                 "example": {
@@ -1757,7 +1802,12 @@
                     ],
                     "intros": [
                         "https://cdn.jikanzo.com/users/jane_intro_video.mp4"
-                    ]
+                    ],
+                    "companionProfileImage": "https://cdn.jikanzo.com/users/jane_companion_profile.jpg",
+                    "companionGallery": [
+                        "https://cdn.jikanzo.com/users/jane_comp_gallery_1.jpg"
+                    ],
+                    "companionGalleryLayout": "1"
                 }
             },
             "CreateBookingRequest": {
@@ -3749,9 +3799,6 @@
                     }
                 }
             }
-        },
-        "/api/user/whoami": {
-            "$ref": "#/paths/~1user~1whoami"
         },
         "/api/user/active-location": {
             "$ref": "#/paths/~1user~1active-location"
