@@ -17,16 +17,6 @@ const ActivityInput = {
   }
 };
 
-const SubActivityInput = {
-  type: 'object',
-  properties: {
-    activityId: { type: 'integer' },
-    name: { type: 'string' },
-    description: { type: 'string' },
-    isActive: { type: 'boolean' }
-  }
-};
-
 const SetCompanionActivitiesInput = {
   type: 'object',
   properties: {
@@ -37,11 +27,7 @@ const SetCompanionActivitiesInput = {
         properties: {
           activityId: { type: 'integer' },
           price: { type: 'number' },
-          isActive: { type: 'boolean' },
-          subActivityIds: {
-            type: 'array',
-            items: { type: 'integer' }
-          }
+          isActive: { type: 'boolean' }
         }
       }
     }
@@ -70,31 +56,7 @@ const ActivityModel = {
   }
 };
 
-const SubActivityModel = {
-  type: 'object',
-  properties: {
-    id: { type: 'integer', example: 1 },
-    activityId: { type: 'integer', example: 1 },
-    name: { type: 'string', example: 'Coffee Cafe' },
-    description: { type: 'string', example: 'Coffee Cafe' },
-    isActive: { type: 'boolean', example: true }
-  }
-};
 
-const ActivityWithSubActivitiesModel = {
-  allOf: [
-    { $ref: '#/components/schemas/ActivityModel' },
-    {
-      type: 'object',
-      properties: {
-        subActivities: {
-          type: 'array',
-          items: { $ref: '#/components/schemas/SubActivityModel' }
-        }
-      }
-    }
-  ]
-};
 
 const CompanionActivityModel = {
   type: 'object',
@@ -104,19 +66,7 @@ const CompanionActivityModel = {
     activityId: { type: 'integer', example: 1 },
     price: { type: 'number', example: 1500 },
     isActive: { type: 'boolean', example: true },
-    activity: { $ref: '#/components/schemas/ActivityModel' },
-    subActivities: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          id: { type: 'integer' },
-          companionActivityId: { type: 'integer' },
-          subActivityId: { type: 'integer' },
-          subActivity: { $ref: '#/components/schemas/SubActivityModel' }
-        }
-      }
-    }
+    activity: { $ref: '#/components/schemas/ActivityModel' }
   }
 };
 
@@ -125,10 +75,7 @@ const CompanionActivityModel = {
 adminDoc.components = adminDoc.components || { schemas: {} };
 adminDoc.components.schemas = adminDoc.components.schemas || {};
 adminDoc.components.schemas.ActivityInput = ActivityInput;
-adminDoc.components.schemas.SubActivityInput = SubActivityInput;
 adminDoc.components.schemas.ActivityModel = ActivityModel;
-adminDoc.components.schemas.SubActivityModel = SubActivityModel;
-adminDoc.components.schemas.ActivityWithSubActivitiesModel = ActivityWithSubActivitiesModel;
 adminDoc.components.schemas.BaseErrorResponse = BaseErrorResponse;
 
 adminDoc.paths = adminDoc.paths || {};
@@ -176,7 +123,7 @@ adminDoc.paths['/api/admin/activity'] = {
               properties: {
                 status: { type: 'boolean', example: true },
                 msg: { type: 'string', example: 'Activities fetched successfully' },
-                data: { type: 'array', items: { $ref: '#/components/schemas/ActivityWithSubActivitiesModel' } }
+                data: { type: 'array', items: { $ref: '#/components/schemas/ActivityModel' } }
               }
             }
           }
@@ -243,92 +190,7 @@ adminDoc.paths['/api/admin/activity/{id}'] = {
   }
 };
 
-adminDoc.paths['/api/admin/sub-activity'] = {
-  post: {
-    tags: ['Activity'],
-    summary: 'Create sub-activity',
-    security: [{ bearerAuth: [] }],
-    requestBody: {
-      required: true,
-      content: { 'application/json': { schema: { $ref: '#/components/schemas/SubActivityInput' } } }
-    },
-    responses: {
-      '201': {
-        description: 'Sub-activity created successfully',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object',
-              properties: {
-                status: { type: 'boolean', example: true },
-                msg: { type: 'string', example: 'Sub-activity created successfully' },
-                data: { $ref: '#/components/schemas/SubActivityModel' }
-              }
-            }
-          }
-        }
-      },
-      '400': { description: 'Bad Request', content: { 'application/json': { schema: { $ref: '#/components/schemas/BaseErrorResponse' } } } },
-      '500': { description: 'Server Error', content: { 'application/json': { schema: { $ref: '#/components/schemas/BaseErrorResponse' } } } }
-    }
-  }
-};
 
-adminDoc.paths['/api/admin/sub-activity/{id}'] = {
-  put: {
-    tags: ['Activity'],
-    summary: 'Update sub-activity',
-    security: [{ bearerAuth: [] }],
-    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
-    requestBody: {
-      required: true,
-      content: { 'application/json': { schema: { $ref: '#/components/schemas/SubActivityInput' } } }
-    },
-    responses: {
-      '200': {
-        description: 'Sub-activity updated successfully',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object',
-              properties: {
-                status: { type: 'boolean', example: true },
-                msg: { type: 'string', example: 'Sub-activity updated successfully' },
-                data: { $ref: '#/components/schemas/SubActivityModel' }
-              }
-            }
-          }
-        }
-      },
-      '400': { description: 'Bad Request', content: { 'application/json': { schema: { $ref: '#/components/schemas/BaseErrorResponse' } } } },
-      '500': { description: 'Server Error', content: { 'application/json': { schema: { $ref: '#/components/schemas/BaseErrorResponse' } } } }
-    }
-  },
-  delete: {
-    tags: ['Activity'],
-    summary: 'Delete sub-activity',
-    security: [{ bearerAuth: [] }],
-    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
-    responses: {
-      '200': {
-        description: 'Sub-activity deleted successfully',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object',
-              properties: {
-                status: { type: 'boolean', example: true },
-                msg: { type: 'string', example: 'Sub-activity deleted successfully' }
-              }
-            }
-          }
-        }
-      },
-      '400': { description: 'Bad Request', content: { 'application/json': { schema: { $ref: '#/components/schemas/BaseErrorResponse' } } } },
-      '500': { description: 'Server Error', content: { 'application/json': { schema: { $ref: '#/components/schemas/BaseErrorResponse' } } } }
-    }
-  }
-};
 
 
 // Inject Schemas into Mobile Doc
@@ -336,8 +198,6 @@ mobileDoc.components = mobileDoc.components || { schemas: {} };
 mobileDoc.components.schemas = mobileDoc.components.schemas || {};
 mobileDoc.components.schemas.SetCompanionActivitiesInput = SetCompanionActivitiesInput;
 mobileDoc.components.schemas.ActivityModel = ActivityModel;
-mobileDoc.components.schemas.SubActivityModel = SubActivityModel;
-mobileDoc.components.schemas.ActivityWithSubActivitiesModel = ActivityWithSubActivitiesModel;
 mobileDoc.components.schemas.CompanionActivityModel = CompanionActivityModel;
 mobileDoc.components.schemas.BaseErrorResponse = BaseErrorResponse;
 
@@ -358,7 +218,7 @@ mobileDoc.paths['/api/companion/activity/available'] = {
               properties: {
                 status: { type: 'boolean', example: true },
                 msg: { type: 'string', example: 'Available activities fetched successfully' },
-                data: { type: 'array', items: { $ref: '#/components/schemas/ActivityWithSubActivitiesModel' } }
+                data: { type: 'array', items: { $ref: '#/components/schemas/ActivityModel' } }
               }
             }
           }

@@ -36,11 +36,7 @@ export const createActivity = async (req: Request, res: Response) => {
  */
 export const getActivities = async (req: Request, res: Response) => {
     try {
-        const activities = await prisma.activity.findMany({
-            include: {
-                subActivities: true
-            }
-        });
+        const activities = await prisma.activity.findMany();
         res.status(200).json({ status: true, msg: "Activities fetched successfully", data: activities });
     } catch (error: any) {
         console.error("Get Activities Error:", error);
@@ -97,86 +93,6 @@ export const deleteActivity = async (req: Request, res: Response) => {
         res.status(200).json({ status: true, msg: "Activity deleted successfully" });
     } catch (error: any) {
         console.error("Delete Activity Error:", error);
-        res.status(500).json({ status: false, msg: error.message || "Server error" });
-    }
-};
-
-/**
- * @Description Create sub-activity
- * @Route POST /api/admin/sub-activity
- * @Access Private
- */
-export const createSubActivity = async (req: Request, res: Response) => {
-    try {
-        const { activityId, name, description, isActive } = req.body;
-        
-        if (!activityId || !name) {
-            return res.status(400).json({ status: false, msg: "Activity ID and name are required" });
-        }
-
-        const subActivity = await prisma.subActivity.create({
-            data: {
-                activityId: parseInt(activityId),
-                name,
-                description,
-                isActive: isActive ?? true
-            }
-        });
-        res.status(201).json({ status: true, msg: "Sub-activity created successfully", data: subActivity });
-    } catch (error: any) {
-        console.error("Create Sub-Activity Error:", error);
-        res.status(500).json({ status: false, msg: error.message || "Server error" });
-    }
-};
-
-/**
- * @Description Update sub-activity
- * @Route PUT /api/admin/sub-activity/:id
- * @Access Private
- */
-export const updateSubActivity = async (req: Request, res: Response) => {
-    try {
-        const { id } = req.params;
-        const { name, description, isActive } = req.body;
-        
-        if (!id) {
-            return res.status(400).json({ status: false, msg: "Sub-activity ID is required" });
-        }
-
-        const subActivity = await prisma.subActivity.update({
-            where: { id: parseInt(id) },
-            data: {
-                name,
-                description,
-                isActive
-            }
-        });
-        res.status(200).json({ status: true, msg: "Sub-activity updated successfully", data: subActivity });
-    } catch (error: any) {
-        console.error("Update Sub-Activity Error:", error);
-        res.status(500).json({ status: false, msg: error.message || "Server error" });
-    }
-};
-
-/**
- * @Description Delete sub-activity
- * @Route DELETE /api/admin/sub-activity/:id
- * @Access Private
- */
-export const deleteSubActivity = async (req: Request, res: Response) => {
-    try {
-        const { id } = req.params;
-        
-        if (!id) {
-            return res.status(400).json({ status: false, msg: "Sub-activity ID is required" });
-        }
-
-        await prisma.subActivity.delete({
-            where: { id: parseInt(id) }
-        });
-        res.status(200).json({ status: true, msg: "Sub-activity deleted successfully" });
-    } catch (error: any) {
-        console.error("Delete Sub-Activity Error:", error);
         res.status(500).json({ status: false, msg: error.message || "Server error" });
     }
 };

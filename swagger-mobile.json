@@ -1959,12 +1959,6 @@
                 },
                 "isActive": {
                   "type": "boolean"
-                },
-                "subActivityIds": {
-                  "type": "array",
-                  "items": {
-                    "type": "integer"
-                  }
                 }
               }
             }
@@ -2072,26 +2066,6 @@
           },
           "activity": {
             "$ref": "#/components/schemas/ActivityModel"
-          },
-          "subActivities": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "integer"
-                },
-                "companionActivityId": {
-                  "type": "integer"
-                },
-                "subActivityId": {
-                  "type": "integer"
-                },
-                "subActivity": {
-                  "$ref": "#/components/schemas/SubActivityModel"
-                }
-              }
-            }
           }
         }
       },
@@ -9042,7 +9016,7 @@
                     "data": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/ActivityWithSubActivitiesModel"
+                        "$ref": "#/components/schemas/ActivityModel"
                       }
                     }
                   }

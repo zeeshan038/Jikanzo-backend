@@ -619,6 +619,11 @@ export const whoami = async (req: Request, res: Response): Promise<any> => {
                         profileImage: true,
                         gallery: true,
                         galleryLayout: true,
+                        activities: {
+                            include: {
+                                activity: true
+                            }
+                        }
                     }
                 }
             }

@@ -355,21 +355,9 @@ model Activity {
   description   String?
   image         String?
   isActive      Boolean       @default(true)
-  subActivities SubActivity[]
   companionActivities CompanionActivity[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
-}
-
-model SubActivity {
-  id            Int      @id @default(autoincrement())
-  activityId    Int
-  name          String
-  description   String?
-  isActive      Boolean  @default(true)
-  
-  activity      Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
-  companionSubActivities CompanionSubActivity[]
 }
 
 model CompanionActivity {
@@ -381,18 +369,6 @@ model CompanionActivity {
   
   companion     CompanionProfile @relation(fields: [companionId], references: [id], onDelete: Cascade)
   activity      Activity         @relation(fields: [activityId], references: [id], onDelete: Cascade)
-  subActivities CompanionSubActivity[]
   
   @@unique([companionId, activityId])
-}
-
-model CompanionSubActivity {
-  id                  Int      @id @default(autoincrement())
-  companionActivityId Int
-  subActivityId       Int
-  
-  companionActivity   CompanionActivity @relation(fields: [companionActivityId], references: [id], onDelete: Cascade)
-  subActivity         SubActivity       @relation(fields: [subActivityId], references: [id], onDelete: Cascade)
-  
-  @@unique([companionActivityId, subActivityId])
 }

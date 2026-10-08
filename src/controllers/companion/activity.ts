@@ -9,12 +9,7 @@ import prisma from '../../config/db';
 export const getAvailableActivities = async (req: Request, res: Response) => {
     try {
         const activities = await prisma.activity.findMany({
-            where: { isActive: true },
-            include: {
-                subActivities: {
-                    where: { isActive: true }
-                }
-            }
+            where: { isActive: true }
         });
         res.status(200).json({ status: true, msg: "Available activities fetched successfully", data: activities });
     } catch (error: any) {
@@ -43,12 +38,7 @@ export const getCompanionActivities = async (req: Request, res: Response) => {
         const activities = await prisma.companionActivity.findMany({
             where: { companionId: profile.id },
             include: {
-                activity: true,
-                subActivities: {
-                    include: {
-                        subActivity: true
-                    }
-                }
+                activity: true
             }
         });
         res.status(200).json({ status: true, msg: "Companion activities fetched successfully", data: activities });
@@ -66,7 +56,7 @@ export const getCompanionActivities = async (req: Request, res: Response) => {
 export const setCompanionActivities = async (req: Request, res: Response) => {
     try {
         const userId = (req as any).user.id;
-        const { activities } = req.body; // Array of { activityId, price, isActive, subActivityIds }
+        const { activities } = req.body; // Array of { activityId, price, isActive }
 
         if (!activities || !Array.isArray(activities)) {
             return res.status(400).json({ status: false, msg: "Activities array is required" });
@@ -83,12 +73,12 @@ export const setCompanionActivities = async (req: Request, res: Response) => {
         // Use a transaction to update
         await prisma.$transaction(async (tx) => {
             for (const act of activities) {
-                const { activityId, price, isActive, subActivityIds } = act;
+                const { activityId, price, isActive } = act;
                 
                 if (!activityId) continue;
 
                 // Upsert CompanionActivity
-                const compActivity = await tx.companionActivity.upsert({
+                await tx.companionActivity.upsert({
                     where: {
                         companionId_activityId: {
                             companionId: profile.id,
@@ -106,22 +96,6 @@ export const setCompanionActivities = async (req: Request, res: Response) => {
                         isActive: isActive ?? true
                     }
                 });
-
-                // Clear old sub-activities
-                await tx.companionSubActivity.deleteMany({
-                    where: { companionActivityId: compActivity.id }
-                });
-
-                // Create new sub-activities if provided and if activity is active
-                if (isActive && Array.isArray(subActivityIds) && subActivityIds.length > 0) {
-                    const subData = subActivityIds.map((subId: number) => ({
-                        companionActivityId: compActivity.id,
-                        subActivityId: subId
-                    }));
-                    await tx.companionSubActivity.createMany({
-                        data: subData
-                    });
-                }
             }
         });
 
