@@ -1087,6 +1087,14 @@
             "type": "integer",
             "example": 14
           },
+          "rating": {
+            "type": "number",
+            "example": 4.5
+          },
+          "trustRank": {
+            "type": "string",
+            "example": "Premium"
+          },
           "finalScore": {
             "type": "number",
             "example": 22.4,
@@ -1103,6 +1111,14 @@
               "username": {
                 "type": "string",
                 "example": "traveler_jane"
+              },
+              "gender": {
+                "type": "string",
+                "example": "female"
+              },
+              "age": {
+                "type": "integer",
+                "example": 25
               },
               "profileImage": {
                 "type": "string",
@@ -1959,6 +1975,18 @@
                 },
                 "isActive": {
                   "type": "boolean"
+                },
+                "subActivityIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "selectedSubActivities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 }
               }
             }

@@ -73,7 +73,8 @@ export const setCompanionActivities = async (req: Request, res: Response) => {
         // Use a transaction to update
         await prisma.$transaction(async (tx) => {
             for (const act of activities) {
-                const { activityId, price, isActive } = act;
+                const { activityId, price, isActive, subActivityIds, selectedSubActivities } = act;
+                const finalSubActivities = subActivityIds || selectedSubActivities || [];
                 
                 if (!activityId) continue;
 
@@ -87,13 +88,15 @@ export const setCompanionActivities = async (req: Request, res: Response) => {
                     },
                     update: {
                         price: price ?? 0,
-                        isActive: isActive ?? true
+                        isActive: isActive ?? true,
+                        selectedSubActivities: finalSubActivities
                     },
                     create: {
                         companionId: profile.id,
                         activityId,
                         price: price ?? 0,
-                        isActive: isActive ?? true
+                        isActive: isActive ?? true,
+                        selectedSubActivities: finalSubActivities
                     }
                 });
             }

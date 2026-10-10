@@ -355,6 +355,7 @@ model Activity {
   description   String?
   image         String?
   isActive      Boolean       @default(true)
+  subActivities String[]      @default([])
   companionActivities CompanionActivity[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
@@ -366,6 +367,7 @@ model CompanionActivity {
   activityId    Int
   price         Float    @default(0)
   isActive      Boolean  @default(true)
+  selectedSubActivities String[] @default([])
   
   companion     CompanionProfile @relation(fields: [companionId], references: [id], onDelete: Cascade)
   activity      Activity         @relation(fields: [activityId], references: [id], onDelete: Cascade)

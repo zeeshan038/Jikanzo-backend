@@ -8,7 +8,7 @@ import prisma from '../../config/db';
  */
 export const createActivity = async (req: Request, res: Response) => {
     try {
-        const { name, description, image, isActive } = req.body;
+        const { name, description, image, isActive, subActivities } = req.body;
 
         if (!name) {
             return res.status(400).json({ status: false, msg: "Name is required" });
@@ -19,7 +19,8 @@ export const createActivity = async (req: Request, res: Response) => {
                 name,
                 description,
                 image,
-                isActive: isActive ?? true
+                isActive: isActive ?? true,
+                subActivities: subActivities || []
             }
         });
         res.status(201).json({ status: true, msg: "Activity created successfully", data: activity });
@@ -52,7 +53,7 @@ export const getActivities = async (req: Request, res: Response) => {
 export const updateActivity = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        const { name, description, image, isActive } = req.body;
+        const { name, description, image, isActive, subActivities } = req.body;
         
         if (!id) {
             return res.status(400).json({ status: false, msg: "Activity ID is required" });
@@ -64,7 +65,8 @@ export const updateActivity = async (req: Request, res: Response) => {
                 name,
                 description,
                 image,
-                isActive
+                isActive,
+                subActivities: subActivities !== undefined ? subActivities : undefined
             }
         });
         res.status(200).json({ status: true, msg: "Activity updated successfully", data: activity });

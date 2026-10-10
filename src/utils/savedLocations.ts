@@ -6,9 +6,7 @@ export type SavedLocation = {
   lat: number;
   lng: number;
   name?: string;
-  /** Exactly one entry should be true — used for discover map pin and CompanionProfile.locationLat/Lng sync. */
   isActive?: boolean;
-  /** @deprecated Prefer isActive. Still honored when isActive is not set on any entry. */
   isPrimary?: boolean;
 };
 
@@ -17,14 +15,14 @@ export function parseCoordinate(value: unknown): number | null {
   if (typeof value === 'string' && value.trim() !== '') {
     const n = parseFloat(value);
     return Number.isFinite(n) ? n : null;
-  }
+  } 
   return null;
 }
 
 /** Normalize and validate saved locations from API input or DB JSON. */
 export function normalizeSavedLocations(input: unknown): SavedLocation[] {
   if (!Array.isArray(input)) return [];
-
+ 
   const parsed: SavedLocation[] = [];
   for (const item of input) {
     if (!item || typeof item !== 'object') continue;

@@ -100,12 +100,16 @@ export const getCompanionsFeed = async (req: Request, res: Response) => {
                 completedMeetups: true,
                 locationLat: true,
                 locationLng: true,
+                rating: true,
+                trustRank: true,
                 user: {
                     select: {
                         id: true,
                         username: true,
                         profileImage: true,
                         about: true,
+                        gender: true,
+                        age: true,
                     }
                 },
                 ...(currentUserId ? { feedStats: { where: { userId: Number(currentUserId) } } } : {})

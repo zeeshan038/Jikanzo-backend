@@ -401,6 +401,12 @@
           },
           "isActive": {
             "type": "boolean"
+          },
+          "subActivities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -443,6 +449,13 @@
           "isActive": {
             "type": "boolean",
             "example": true
+          },
+          "subActivities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": ["Coffee Meetups", "Coffee Cafe"]
           },
           "createdAt": {
             "type": "string",

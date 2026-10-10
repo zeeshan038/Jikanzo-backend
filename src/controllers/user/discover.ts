@@ -30,7 +30,12 @@ export const discoverPeople = async (req: Request, res: Response) => {
             });
         }
 
+        const userId = (req as any).user?.id;
+
         const companions = await prismaClient.companionProfile.findMany({
+            where: userId ? {
+                userId: { not: userId }
+            } : undefined,
             select: {
                 id: true,
                 bio: true,
