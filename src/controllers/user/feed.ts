@@ -259,6 +259,11 @@ export const specificCompanion = async (req: Request, res: Response): Promise<an
                 },
                 savedBy: {
                     where: { userId: currentUserId }
+                },
+                activities: {
+                    include: {
+                        activity: true
+                    }
                 }
             }
         });

@@ -3606,6 +3606,12 @@
                                                         }
                                                     }
                                                 },
+                                                "activities": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/CompanionActivityModel"
+                                                    }
+                                                },
                                                 "reviews": {
                                                     "type": "array",
                                                     "items": {
@@ -3778,6 +3784,29 @@
                                                 ],
                                                 "galleryLayout": "2"
                                             },
+                                            "activities": [
+                                                {
+                                                    "id": 1,
+                                                    "companionId": 42,
+                                                    "activityId": 12,
+                                                    "price": 1500,
+                                                    "isActive": true,
+                                                    "selectedSubActivities": [
+                                                        "Coffee Meetups"
+                                                    ],
+                                                    "activity": {
+                                                        "id": 12,
+                                                        "name": "Coffee Meetups",
+                                                        "description": "A nice cup of coffee",
+                                                        "image": null,
+                                                        "isActive": true,
+                                                        "subActivities": [
+                                                            "Coffee Meetups",
+                                                            "Coffee in Mall"
+                                                        ]
+                                                    }
+                                                }
+                                            ],
                                             "reviews": []
                                         }
                                     }
