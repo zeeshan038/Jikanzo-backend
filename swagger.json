@@ -1394,6 +1394,12 @@
                             },
                             "galleryLayout": {
                                 "type": "string"
+                            },
+                            "activities": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/CompanionActivityModel"
+                                }
                             }
                         }
                     },
@@ -2101,6 +2107,16 @@
                     "isActive": {
                         "type": "boolean",
                         "example": true
+                    },
+                    "selectedSubActivities": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "Coffee Meetups",
+                            "Coffee in Mall"
+                        ]
                     },
                     "activity": {
                         "$ref": "#/components/schemas/ActivityModel"
