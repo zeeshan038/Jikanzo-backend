@@ -10,6 +10,11 @@ import {
 import { EXTENSION_PROMPT_TYPES } from '../sockets/constants';
 import type { ExtensionPromptType } from '../sockets/bookingEmit';
 import { sendPushNotification } from '../utils/notification';
+import {
+  bookingNotifData,
+  formatBookingSchedule,
+  personName,
+} from '../utils/bookingNotifications';
 import { refreshAllActiveHomeBars } from './homeBar';
 import { emitBookingCoordinationClosed, refreshHomeBarForBooking } from '../sockets/bookingEmit';
 import { runCoordinationCronTasks } from './coordination';
@@ -41,7 +46,13 @@ async function processExtensionPromptBeforeStart(
       [sentField]: null,
       extensionStatus: { not: 'PENDING' },
     },
-    select: { id: true, clientId: true },
+    select: {
+      id: true,
+      clientId: true,
+      startTime: true,
+      endTime: true,
+      companion: { select: { user: { select: { username: true } } } },
+    },
   });
 
   if (bookings.length === 0) {
@@ -52,7 +63,6 @@ async function processExtensionPromptBeforeStart(
     minutesBefore === 30
       ? 'Meeting starts in 30 minutes'
       : 'Meeting starts in 15 minutes';
-  const body = 'Need more time together? Tap to request a session extension.';
   const notifType = minutesBefore === 30 ? 'EXTENSION_PROMPT_30' : 'EXTENSION_PROMPT_15';
 
   for (const booking of bookings) {
@@ -64,11 +74,22 @@ async function processExtensionPromptBeforeStart(
       continue;
     }
 
-    sendPushNotification(booking.clientId, title, body, {
-      bookingId: String(booking.id),
-      promptType,
-      action: 'SHOW_EXTENSION_SHEET',
-    }, notifType).catch((err) =>
+    const companionName = personName(booking.companion.user?.username);
+    const when = formatBookingSchedule(booking.startTime, booking.endTime);
+    const body = `Your booking with ${companionName} starts soon (${when}). Need more time? Tap to request an extension.`;
+
+    sendPushNotification(
+      booking.clientId,
+      title,
+      body,
+      bookingNotifData(booking.id, {
+        promptType,
+        action: 'SHOW_EXTENSION_SHEET',
+        type: notifType,
+        fromUsername: companionName,
+      }),
+      notifType
+    ).catch((err) =>
       console.error(`[CRON] extension ${minutesBefore}m push:`, err)
     );
 
@@ -107,6 +128,10 @@ async function expireStalePendingRequests() {
       id: true,
       clientId: true,
       companionId: true,
+      startTime: true,
+      endTime: true,
+      client: { select: { username: true } },
+      companion: { select: { userId: true, user: { select: { username: true } } } },
     },
   });
 
@@ -128,6 +153,32 @@ async function expireStalePendingRequests() {
     emitBookingRequestExpired(booking.id, booking.companionId, booking.clientId).catch((err) =>
       console.error('[CRON] Socket emit expired:', err)
     );
+
+    const when = formatBookingSchedule(booking.startTime, booking.endTime);
+    const clientName = personName(booking.client.username);
+    const companionName = personName(booking.companion.user?.username);
+    const data = bookingNotifData(booking.id, {
+      status: 'CANCELLED',
+      type: 'BOOKING_EXPIRED',
+    });
+
+    sendPushNotification(
+      booking.clientId,
+      'Booking Request Expired',
+      `Your booking request with ${companionName} for ${when} expired — no response within 30 minutes. Booking #${booking.id}.`,
+      { ...data, fromUsername: companionName },
+      'BOOKING_EXPIRED'
+    ).catch((err) => console.error('[CRON] expired push (client):', err));
+
+    if (booking.companion.userId) {
+      sendPushNotification(
+        booking.companion.userId,
+        'Booking Request Expired',
+        `Booking request from ${clientName} for ${when} expired — no response within 30 minutes. Booking #${booking.id}.`,
+        { ...data, fromUsername: clientName },
+        'BOOKING_EXPIRED'
+      ).catch((err) => console.error('[CRON] expired push (companion):', err));
+    }
   }
 }
 

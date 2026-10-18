@@ -50,7 +50,7 @@ export const getDashboardData = async (req: Request, res: Response): Promise<voi
       }
     });
 
-    // 2. Today's schedule (by session startTime, aligned with booking list statuses)
+    // 2. Today's schedule — only confirmed sessions (not PENDING requests)
     const todayBookings = await prisma.booking.findMany({
       where: {
         companionId: profile.id,
@@ -59,7 +59,7 @@ export const getDashboardData = async (req: Request, res: Response): Promise<voi
           lt: tomorrow,
         },
         status: {
-          in: ['PENDING', 'ACCEPTED', 'ACTIVE', 'COMPLETED'],
+          in: ['ACCEPTED', 'ACTIVE', 'COMPLETED'],
         },
       },
       orderBy: {

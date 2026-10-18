@@ -29,6 +29,11 @@ import {
 } from "../../sockets";
 import { getStoredOrComputedBreakdown } from "../../utils/bookingFinance";
 import { sendPushNotification } from "../../utils/notification";
+import {
+  bookingNotifData,
+  formatBookingSchedule,
+  personName,
+} from "../../utils/bookingNotifications";
 
 /**
  * @Description Book a companion
@@ -92,18 +97,28 @@ export const bookCompanion = async (req: Request, res: Response) => {
       }
     });
 
-    // Send push notification to the companion
-    import('../../utils/notification').then(({ sendPushNotification }) => {
-      if (companion.userId) {
-        sendPushNotification(
-          companion.userId,
-          "New Booking Request",
-          "You have received a new booking request.",
-          { bookingId: booking.id },
-          "NEW_BOOKING_REQUEST"
-        );
-      }
-    }).catch(err => console.error("Failed to send notification:", err));
+    if (companion.userId) {
+      const client = await prisma.user.findUnique({
+        where: { id: clientId },
+        select: { username: true },
+      });
+      const clientName = personName(client?.username);
+      const when = formatBookingSchedule(startDate, endDate);
+      const activityPart = payload.activity ? ` for ${payload.activity}` : '';
+      const addressPart = payload.address ? ` at ${payload.address}` : '';
+      sendPushNotification(
+        companion.userId,
+        'New Booking Request',
+        `${clientName} requested a booking${activityPart} on ${when}${addressPart}. Booking #${booking.id}.`,
+        bookingNotifData(booking.id, {
+          status: 'PENDING',
+          type: 'NEW_BOOKING_REQUEST',
+          fromUserId: String(clientId),
+          fromUsername: clientName,
+        }),
+        'NEW_BOOKING_REQUEST'
+      ).catch((err) => console.error('[Push] new booking request:', err));
+    }
 
     emitBookingRequestNew(booking.id, Number(companionId)).catch((err) =>
       console.error("[Socket] emitBookingRequestNew:", err)
@@ -147,7 +162,9 @@ export const acceptBookingController = async (req: Request, res: Response) => {
 
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { companion: true }
+      include: {
+        companion: { include: { user: { select: { id: true, username: true } } } },
+      },
     });
 
     if (!booking) {
@@ -208,6 +225,36 @@ export const acceptBookingController = async (req: Request, res: Response) => {
     refreshHomeBarForBooking(bookingId).catch((err) =>
       console.error("[Socket] refreshHomeBarForBooking:", err)
     );
+
+    const companionName = personName(booking.companion.user?.username);
+    const when = formatBookingSchedule(booking.startTime, booking.endTime);
+    if (action === 'ACCEPT') {
+      sendPushNotification(
+        booking.clientId,
+        'Booking Confirmed',
+        `${companionName} confirmed your booking on ${when}. Booking #${bookingId}.`,
+        bookingNotifData(bookingId, {
+          status: 'ACCEPTED',
+          type: 'BOOKING_CONFIRMED',
+          fromUserId: String(booking.companion.userId),
+          fromUsername: companionName,
+        }),
+        'BOOKING_CONFIRMED'
+      ).catch((err) => console.error('[Push] booking confirmed:', err));
+    } else {
+      sendPushNotification(
+        booking.clientId,
+        'Booking Declined',
+        `${companionName} declined your booking request for ${when}. Booking #${bookingId}.`,
+        bookingNotifData(bookingId, {
+          status: 'CANCELLED',
+          type: 'BOOKING_DECLINED',
+          fromUserId: String(booking.companion.userId),
+          fromUsername: companionName,
+        }),
+        'BOOKING_DECLINED'
+      ).catch((err) => console.error('[Push] booking declined:', err));
+    }
 
     return res.status(200).json({
       status: true,
@@ -437,7 +484,10 @@ export const requestExtension = async (req: Request, res: Response) => {
   try {
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { companion: true }
+      include: {
+        companion: { include: { user: { select: { id: true, username: true } } } },
+        client: { select: { id: true, username: true } },
+      },
     });
 
     if (!booking) {
@@ -476,6 +526,24 @@ export const requestExtension = async (req: Request, res: Response) => {
       console.error('[Socket] emitBookingExtensionRequested:', err)
     );
 
+    const companionUserId = booking.companion.userId;
+    if (companionUserId) {
+      const clientName = personName(booking.client.username);
+      const hoursLabel = `${extensionHours} hour${extensionHours === 1 ? '' : 's'}`;
+      sendPushNotification(
+        companionUserId,
+        'Extension Request',
+        `${clientName} requested a ${hoursLabel} extension for booking #${bookingId} (${formatBookingSchedule(booking.startTime, booking.endTime)}).`,
+        bookingNotifData(bookingId, {
+          type: 'EXTENSION_REQUESTED',
+          extensionHours: String(extensionHours),
+          fromUserId: String(clientId),
+          fromUsername: clientName,
+        }),
+        'EXTENSION_REQUESTED'
+      ).catch((err) => console.error('[Push] extension requested:', err));
+    }
+
     return res.status(200).json({
       status: true,
       msg: "Extension request sent to companion",
@@ -508,7 +576,9 @@ export const respondToExtension = async (req: Request, res: Response) => {
 
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { companion: true },
+      include: {
+        companion: { include: { user: { select: { id: true, username: true } } } },
+      },
     });
 
     if (!booking) {
@@ -524,6 +594,7 @@ export const respondToExtension = async (req: Request, res: Response) => {
     }
 
     let updateData: any = {};
+    const extensionHours = booking.extensionHours || 0;
 
     if (action === 'ACCEPT') {
       const extensionGross = booking.extensionAmount || 0;
@@ -549,7 +620,7 @@ export const respondToExtension = async (req: Request, res: Response) => {
       }
 
       const currentEndTime = new Date(booking.endTime);
-      currentEndTime.setHours(currentEndTime.getHours() + (booking.extensionHours || 0));
+      currentEndTime.setHours(currentEndTime.getHours() + extensionHours);
 
       const hourlyRate = booking.companion.hourlyRate || 0;
       const amounts = recalculateBookingAmount(hourlyRate, booking.startTime, currentEndTime);
@@ -583,6 +654,36 @@ export const respondToExtension = async (req: Request, res: Response) => {
       console.error('[Socket] emitBookingRequestUpdated:', err)
     );
 
+    const companionName = personName(booking.companion.user?.username);
+    const hoursLabel = `${extensionHours} hour${extensionHours === 1 ? '' : 's'}`;
+    if (action === 'ACCEPT') {
+      sendPushNotification(
+        booking.clientId,
+        'Extension Confirmed',
+        `${companionName} accepted your ${hoursLabel} extension for booking #${bookingId}.`,
+        bookingNotifData(bookingId, {
+          type: 'EXTENSION_ACCEPTED',
+          extensionStatus: 'ACCEPTED',
+          fromUserId: String(booking.companion.userId),
+          fromUsername: companionName,
+        }),
+        'EXTENSION_ACCEPTED'
+      ).catch((err) => console.error('[Push] extension accepted:', err));
+    } else {
+      sendPushNotification(
+        booking.clientId,
+        'Extension Declined',
+        `${companionName} declined your extension request for booking #${bookingId}.`,
+        bookingNotifData(bookingId, {
+          type: 'EXTENSION_DENIED',
+          extensionStatus: 'DENIED',
+          fromUserId: String(booking.companion.userId),
+          fromUsername: companionName,
+        }),
+        'EXTENSION_DENIED'
+      ).catch((err) => console.error('[Push] extension denied:', err));
+    }
+
     return res.status(200).json({
       status: true,
       msg: `Extension request ${action.toLowerCase()}ed`,
@@ -605,7 +706,10 @@ export const startBookingController = async (req: Request, res: Response) => {
   try {
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { companion: true }
+      include: {
+        companion: { include: { user: { select: { id: true, username: true } } } },
+        client: { select: { id: true, username: true } },
+      },
     });
 
     if (!booking) {
@@ -648,14 +752,19 @@ export const startBookingController = async (req: Request, res: Response) => {
       console.error('[Socket] refreshHomeBarForBooking:', err)
     );
 
-    const pushTitle = 'Session started';
-    const pushBody = 'Your booking session is now in progress.';
-    const pushData = { bookingId: String(bookingId), status: 'ACTIVE' };
+    const clientName = personName(booking.client.username);
+    const companionName = personName(booking.companion.user?.username);
+    const when = formatBookingSchedule(booking.startTime, booking.endTime);
+    const pushData = bookingNotifData(bookingId, {
+      status: 'ACTIVE',
+      type: 'BOOKING_STARTED',
+    });
+
     sendPushNotification(
       booking.clientId,
-      pushTitle,
-      pushBody,
-      pushData,
+      'Session Started',
+      `Your session with ${companionName} is now in progress (${when}). Booking #${bookingId}.`,
+      { ...pushData, counterparty: companionName },
       'BOOKING_STARTED'
     ).catch((err) => console.error('[Push] booking started (client):', err));
 
@@ -663,9 +772,9 @@ export const startBookingController = async (req: Request, res: Response) => {
     if (companionUserId) {
       sendPushNotification(
         companionUserId,
-        pushTitle,
-        pushBody,
-        pushData,
+        'Session Started',
+        `Your session with ${clientName} is now in progress (${when}). Booking #${bookingId}.`,
+        { ...pushData, counterparty: clientName },
         'BOOKING_STARTED'
       ).catch((err) => console.error('[Push] booking started (companion):', err));
     }
@@ -841,7 +950,10 @@ export const cancelBookingController = async (req: Request, res: Response) => {
   try {
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { companion: true },
+      include: {
+        companion: { include: { user: { select: { id: true, username: true } } } },
+        client: { select: { id: true, username: true } },
+      },
     });
 
     if (!booking) {
@@ -903,6 +1015,27 @@ export const cancelBookingController = async (req: Request, res: Response) => {
     emitBookingCoordinationClosed(bookingId, 'This booking was cancelled.').catch((err) =>
       console.error('[Socket] emitBookingCoordinationClosed:', err)
     );
+
+    const cancellerName = personName(
+      isClient ? booking.client.username : booking.companion.user?.username
+    );
+    const when = formatBookingSchedule(booking.startTime, booking.endTime);
+    const recipientUserId = isClient ? booking.companion.userId : booking.clientId;
+    if (recipientUserId) {
+      sendPushNotification(
+        recipientUserId,
+        'Booking Cancelled',
+        `${cancellerName} cancelled the booking on ${when}. Reason: ${cancellationReason}. Booking #${bookingId}.`,
+        bookingNotifData(bookingId, {
+          status: 'CANCELLED',
+          type: 'BOOKING_CANCELLED',
+          fromUserId: String(userId),
+          fromUsername: cancellerName,
+          reasonCode,
+        }),
+        'BOOKING_CANCELLED'
+      ).catch((err) => console.error('[Push] booking cancelled:', err));
+    }
 
     return res.status(200).json({
       status: true,
