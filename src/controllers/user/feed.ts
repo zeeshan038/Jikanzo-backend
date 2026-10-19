@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import prisma from "../../config/db";
+import { resolveCompanionHourlyRate } from "../../constants/companionPricing";
 import { activeMomentsWhere } from "../../constants/moments";
 import { normalizeSavedLocations } from "../../utils/savedLocations";
 
@@ -331,6 +332,7 @@ export const specificCompanion = async (req: Request, res: Response): Promise<an
 
         const responseData = {
             ...companionData,
+            hourlyRate: resolveCompanionHourlyRate(companionData.hourlyRate),
             user: {
                 ...companion.user,
                 savedLocations: normalizeSavedLocations(companion.user.savedLocations),
@@ -456,7 +458,7 @@ export const getSavedCompanions = async (req: Request, res: Response): Promise<a
             profileImage: s.companion.user.profileImage,
             isOnline: s.companion.isOnline,
             rating: s.companion.rating,
-            hourlyRate: s.companion.hourlyRate,
+            hourlyRate: resolveCompanionHourlyRate(s.companion.hourlyRate),
             savedAt: s.createdAt
         }));
 

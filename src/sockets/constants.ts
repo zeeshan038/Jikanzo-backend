@@ -28,6 +28,11 @@ export const SOCKET_EVENTS = {
   TRACKING_ENDED: 'booking:tracking:ended',
   /** Feed/home blue bar — upcoming booking + OTP (within 30 min of start). */
   HOME_BAR: 'booking:home:bar',
+  /**
+   * Companion home "Today booking" cards — STARTS_IN / ENTER_OTP / ENDS_IN.
+   * Emitted on connect, booking changes, and every minute (cron) for phase flips.
+   */
+  TODAY_CARDS: 'booking:today:cards',
 } as const;
 
 /** Values for booking:extension:prompt payload.promptType */

@@ -6,6 +6,7 @@ import {
   cancelBookingSchema,
   rescheduleBookingSchema,
   verifyBookingOtpSchema,
+  requestExtensionSchema,
 } from "../../schema/user/booking";
 import { payWithWalletSchema } from '../../schema/user/wallet';
 import { calculateJSS } from "../../utils/jssCalculator";
@@ -13,11 +14,14 @@ import { BOOKING_CANCEL_REASONS, isValidCancelReasonCode } from "../../constants
 import { chargeBookingFromWallet } from "../../utils/bookingWallet";
 import {
   BOOKING_REQUEST_EXPIRY_MS,
+  addExtensionToEndTime,
   bookingDetailInclude,
   buildClientSummary,
   buildCompanionBookingDetailProfile,
+  formatExtensionDuration,
   listBookingSelect,
   normalizeBookingListType,
+  parseExtensionHours,
   recalculateBookingAmount,
 } from "../../utils/bookingHelpers";
 import {
@@ -25,9 +29,10 @@ import {
   emitBookingExtensionUpdated,
   emitBookingRequestNew,
   emitBookingRequestUpdated,
-  refreshHomeBarForBooking,
+  refreshBookingRealtimeSurfaces,
 } from "../../sockets";
 import { getStoredOrComputedBreakdown } from "../../utils/bookingFinance";
+import { resolveCompanionHourlyRate } from "../../constants/companionPricing";
 import { sendPushNotification } from "../../utils/notification";
 import {
   bookingNotifData,
@@ -73,7 +78,7 @@ export const bookCompanion = async (req: Request, res: Response) => {
     const durationMs = endDate.getTime() - startDate.getTime();
     const durationHours = durationMs > 0 ? durationMs / (1000 * 60 * 60) : 0;
 
-    const hourlyRate = companion.hourlyRate || 0;
+    const hourlyRate = resolveCompanionHourlyRate(companion.hourlyRate);
     const amounts = recalculateBookingAmount(hourlyRate, startDate, endDate);
 
     const booking = await prisma.booking.create({
@@ -222,8 +227,8 @@ export const acceptBookingController = async (req: Request, res: Response) => {
     emitBookingRequestUpdated(bookingId).catch((err) =>
       console.error("[Socket] emitBookingRequestUpdated:", err)
     );
-    refreshHomeBarForBooking(bookingId).catch((err) =>
-      console.error("[Socket] refreshHomeBarForBooking:", err)
+    refreshBookingRealtimeSurfaces(bookingId).catch((err) =>
+      console.error("[Socket] refreshBookingRealtimeSurfaces:", err)
     );
 
     const companionName = personName(booking.companion.user?.username);
@@ -468,17 +473,29 @@ export const getCompanionBookings = async (req: Request, res: Response) => {
 };
 
 /**
- * @Description Request to extend an active booking
+ * @Description Request to extend an active booking (supports 0.5 = 30 minutes)
  * @Route POST /api/booking/request-extension/:id
  * @Access Private
  */
 export const requestExtension = async (req: Request, res: Response) => {
   const { id: clientId } = (req as any).user;
   const bookingId = parseInt(req.params.id);
-  const { extensionHours } = req.body;
+  const validation = requestExtensionSchema.validate(req.body);
 
-  if (!extensionHours || extensionHours <= 0) {
-    return res.status(400).json({ status: false, msg: "Invalid extension hours" });
+  if (validation.error) {
+    const errors = validation.error.details.map((d: any) => d.message).join(",");
+    return res.status(400).json({
+      status: false,
+      msg: errors || "Invalid extensionHours. Use 0.5 (30 minutes) or whole hours 1–12.",
+    });
+  }
+
+  const extensionHours = parseExtensionHours(validation.value.extensionHours);
+  if (extensionHours == null) {
+    return res.status(400).json({
+      status: false,
+      msg: "Invalid extensionHours. Use 0.5 (30 minutes) or whole hours 1–12.",
+    });
   }
 
   try {
@@ -509,31 +526,34 @@ export const requestExtension = async (req: Request, res: Response) => {
       return res.status(400).json({ status: false, msg: "An extension request is already pending" });
     }
 
-    // Calculate extension amount based on companion's hourly rate
-    const hourlyRate = booking.companion.hourlyRate || 0;
+    // Amount = hourly rate × hours (0.5 hour = half the hourly rate)
+    const hourlyRate = resolveCompanionHourlyRate(booking.companion.hourlyRate);
     const extensionAmount = hourlyRate * extensionHours;
 
     const updatedBooking = await prisma.booking.update({
       where: { id: bookingId },
       data: {
         extensionStatus: 'PENDING',
-        extensionHours: extensionHours,
-        extensionAmount: extensionAmount
+        extensionHours,
+        extensionAmount,
       }
     });
 
     emitBookingExtensionRequested(bookingId).catch((err) =>
       console.error('[Socket] emitBookingExtensionRequested:', err)
     );
+    refreshBookingRealtimeSurfaces(bookingId).catch((err) =>
+      console.error('[Socket] refreshBookingRealtimeSurfaces:', err)
+    );
 
     const companionUserId = booking.companion.userId;
     if (companionUserId) {
       const clientName = personName(booking.client.username);
-      const hoursLabel = `${extensionHours} hour${extensionHours === 1 ? '' : 's'}`;
+      const durationLabel = formatExtensionDuration(extensionHours);
       sendPushNotification(
         companionUserId,
         'Extension Request',
-        `${clientName} requested a ${hoursLabel} extension for booking #${bookingId} (${formatBookingSchedule(booking.startTime, booking.endTime)}).`,
+        `${clientName} requested a ${durationLabel} extension for booking #${bookingId} (${formatBookingSchedule(booking.startTime, booking.endTime)}).`,
         bookingNotifData(bookingId, {
           type: 'EXTENSION_REQUESTED',
           extensionHours: String(extensionHours),
@@ -619,10 +639,9 @@ export const respondToExtension = async (req: Request, res: Response) => {
         }
       }
 
-      const currentEndTime = new Date(booking.endTime);
-      currentEndTime.setHours(currentEndTime.getHours() + extensionHours);
+      const currentEndTime = addExtensionToEndTime(booking.endTime, extensionHours);
 
-      const hourlyRate = booking.companion.hourlyRate || 0;
+      const hourlyRate = resolveCompanionHourlyRate(booking.companion.hourlyRate);
       const amounts = recalculateBookingAmount(hourlyRate, booking.startTime, currentEndTime);
 
       updateData = {
@@ -653,14 +672,17 @@ export const respondToExtension = async (req: Request, res: Response) => {
     emitBookingRequestUpdated(bookingId).catch((err) =>
       console.error('[Socket] emitBookingRequestUpdated:', err)
     );
+    refreshBookingRealtimeSurfaces(bookingId).catch((err) =>
+      console.error('[Socket] refreshBookingRealtimeSurfaces:', err)
+    );
 
     const companionName = personName(booking.companion.user?.username);
-    const hoursLabel = `${extensionHours} hour${extensionHours === 1 ? '' : 's'}`;
+    const durationLabel = formatExtensionDuration(extensionHours);
     if (action === 'ACCEPT') {
       sendPushNotification(
         booking.clientId,
         'Extension Confirmed',
-        `${companionName} accepted your ${hoursLabel} extension for booking #${bookingId}.`,
+        `${companionName} accepted your ${durationLabel} extension for booking #${bookingId}.`,
         bookingNotifData(bookingId, {
           type: 'EXTENSION_ACCEPTED',
           extensionStatus: 'ACCEPTED',
@@ -748,8 +770,8 @@ export const startBookingController = async (req: Request, res: Response) => {
     emitBookingRequestUpdated(bookingId).catch((err) =>
       console.error('[Socket] emitBookingRequestUpdated:', err)
     );
-    refreshHomeBarForBooking(bookingId).catch((err) =>
-      console.error('[Socket] refreshHomeBarForBooking:', err)
+    refreshBookingRealtimeSurfaces(bookingId).catch((err) =>
+      console.error('[Socket] refreshBookingRealtimeSurfaces:', err)
     );
 
     const clientName = personName(booking.client.username);
@@ -1002,8 +1024,8 @@ export const cancelBookingController = async (req: Request, res: Response) => {
     emitBookingRequestUpdated(bookingId).catch((err) =>
       console.error("[Socket] emitBookingRequestUpdated:", err)
     );
-    refreshHomeBarForBooking(bookingId).catch((err) =>
-      console.error("[Socket] refreshHomeBarForBooking:", err)
+    refreshBookingRealtimeSurfaces(bookingId).catch((err) =>
+      console.error("[Socket] refreshBookingRealtimeSurfaces:", err)
     );
 
     const { endBookingTrackingAndNotify } = await import('../../sockets/bookingEmit');
@@ -1095,7 +1117,7 @@ export const rescheduleBookingController = async (req: Request, res: Response) =
 
     const startDate = new Date(payload.startTime);
     const endDate = new Date(payload.endTime);
-    const hourlyRate = booking.companion.hourlyRate || 0;
+    const hourlyRate = resolveCompanionHourlyRate(booking.companion.hourlyRate);
     const amounts = recalculateBookingAmount(hourlyRate, startDate, endDate);
 
     const updatedBooking = await prisma.booking.update({
@@ -1124,8 +1146,8 @@ export const rescheduleBookingController = async (req: Request, res: Response) =
     emitBookingRequestUpdated(bookingId).catch((err) =>
       console.error("[Socket] emitBookingRequestUpdated:", err)
     );
-    refreshHomeBarForBooking(bookingId).catch((err) =>
-      console.error("[Socket] refreshHomeBarForBooking:", err)
+    refreshBookingRealtimeSurfaces(bookingId).catch((err) =>
+      console.error("[Socket] refreshBookingRealtimeSurfaces:", err)
     );
 
     return res.status(200).json({
@@ -1192,8 +1214,8 @@ export const verifyBookingOtpController = async (req: Request, res: Response) =>
       data: { otpVerified: true },
     });
 
-    refreshHomeBarForBooking(bookingId).catch((err) =>
-      console.error("[Socket] refreshHomeBarForBooking:", err)
+    refreshBookingRealtimeSurfaces(bookingId).catch((err) =>
+      console.error("[Socket] refreshBookingRealtimeSurfaces:", err)
     );
 
     return res.status(200).json({

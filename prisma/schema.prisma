@@ -75,7 +75,7 @@ model CompanionProfile {
   user        User     @relation(fields: [userId], references: [id])
   
   bio         String?
-  hourlyRate  Float?
+  hourlyRate  Float?   @default(85) // USD/hr; default when companion has not set pricing
   locationLat Float?
   locationLng Float?
   serviceRadius Int?     @default(10)
@@ -138,7 +138,7 @@ model Booking {
   companionNetAmount Float?
   extensionStatus String   @default("NONE") // NONE, PENDING, ACCEPTED, DENIED
   extensionPaymentStatus String @default("PENDING") // PENDING, PAID, FAILED (extension charge)
-  extensionHours Int?
+  extensionHours Float? // hours to extend; 0.5 = 30 minutes
   extensionAmount Float?
   extensionPrompt30SentAt DateTime?
   extensionPrompt15SentAt DateTime?

@@ -69,13 +69,13 @@ Push data includes things like `bookingId`, `action: SHOW_EXTENSION_SHEET`, and 
 
 ## What is NOT real-time yet?
 
-These still need **normal API calls** and/or manual refresh:
+These still need **normal API calls** (sockets only notify afterward):
 
 - Pay with wallet  
-- Start session / verify OTP  
+- Start session / verify OTP (REST does the action; companion today-card updates via `booking:today:cards`)  
 - Some steps after accept (check backend; use `GET /api/booking/detail/:id` when in doubt)
 
-**OTP is never sent on sockets** — only on the detail API for the client.
+**OTP code is never sent on sockets** — only on the client detail / home-bar APIs.
 
 ---
 
@@ -282,7 +282,7 @@ For every event below:
 **When:** client calls:
 
 `POST /api/booking/request-extension/:bookingId`  
-Body: `{ "extensionHours": 2 }` (example)
+Body: `{ "extensionHours": 0.5 }` (30 minutes) or `{ "extensionHours": 2 }` (whole hours 1–12)
 
 **Payload:** Extension “sheet” data plus:
 
@@ -290,7 +290,7 @@ Body: `{ "extensionHours": 2 }` (example)
 {
   "bookingId": 123,
   "extensionStatus": "PENDING",
-  "extensionHours": 2,
+  "extensionHours": 0.5,
   "extensionAmount": 80,
   "extensionPaymentStatus": "PENDING",
   "startTime": "...",
@@ -308,7 +308,7 @@ Body: `{ "extensionHours": 2 }` (example)
 | Field | Meaning |
 |-------|---------|
 | `extensionStatus` | `"PENDING"` here |
-| `extensionHours` | Hours client asked for |
+| `extensionHours` | Hours client asked for (`0.5` = 30 minutes; also `1`–`12`) |
 | `extensionAmount` | Price for extension |
 | `bottomSheet.companion` | Show Accept / Deny extension UI |
 | `bottomSheet.client` | Show “waiting for companion” UI |
@@ -461,7 +461,7 @@ socket.emit('booking:unsubscribe', { bookingId: 123 });
 
 **F — Client requests extension**
 
-1. Client: `POST /api/booking/request-extension/123` `{ "extensionHours": 2 }`  
+1. Client: `POST /api/booking/request-extension/123` `{ "extensionHours": 0.5 }` (or `1`–`12`)  
 2. Both: `booking:extension:requested`  
 3. Companion: `POST /api/booking/respond-extension/123` `{ "action": "ACCEPT" }`  
 4. Both: `booking:extension:updated` → close sheet or show new end time  
@@ -563,8 +563,10 @@ POST /api/booking/request-extension/{bookingId}
 ```
 
 ```json
-{ "extensionHours": 2 }
+{ "extensionHours": 0.5 }
 ```
+
+Allowed values: `0.5` (30 minutes), then whole hours `1`–`12`.
 
 ### Companion respond to extension
 
@@ -742,3 +744,70 @@ Shows on the main feed **from 30 minutes before `startTime`** until the booking 
 | GET | `/api/booking/home-bar` |
 
 Tap bar → navigate to booking detail / live map using `bookingId`.
+
+---
+
+## 16. Companion “Today booking” cards (`cardPhase`)
+
+**Full guide:** [`BOOKING_TODAY_CARDS.md`](./BOOKING_TODAY_CARDS.md)
+
+Companion home carousel: **Starts in** → **Enter OTP** → **Ends in** (and Extend while `ACTIVE`).
+
+### Server → companion only
+
+| Event | When |
+|-------|------|
+| `booking:today:cards` | On companion socket connect; after accept / cancel / OTP / start / reschedule / extension / complete; every minute (cron) so `STARTS_IN` flips to `ENTER_OTP` |
+
+**Payload:**
+
+```json
+{
+  "bookings": [
+    {
+      "id": 15334,
+      "status": "ACCEPTED",
+      "date": "2026-07-23T00:00:00.000Z",
+      "startTime": "2026-07-23T18:00:00.000Z",
+      "endTime": "2026-07-23T20:00:00.000Z",
+      "address": null,
+      "activity": null,
+      "otpVerified": false,
+      "extensionStatus": "NONE",
+      "clientId": 228,
+      "companionId": 12,
+      "cardPhase": "STARTS_IN",
+      "countdownTarget": "2026-07-23T18:00:00.000Z",
+      "canExtend": false,
+      "client": {
+        "id": 228,
+        "username": "Kenji Sato",
+        "profileImage": "https://..."
+      }
+    }
+  ]
+}
+```
+
+| `cardPhase` | UI |
+|-------------|-----|
+| `STARTS_IN` | Green countdown to `countdownTarget` (= `startTime`) |
+| `ENTER_OTP` | “Enter OTP” — call `POST /api/booking/verify-otp/:id` |
+| `ENDS_IN` | Red countdown to `countdownTarget` (= `endTime`) |
+| `COMPLETED` | Done — no timer |
+
+`canExtend: true` only when `status === "ACTIVE"` (show “Extend Booking”).
+
+**OTP code is never included** (client shows it; companion types it).
+
+### REST (cold start — same card shape)
+
+| Method | Path |
+|--------|------|
+| GET | `/api/companion/dashboard` → `data.todayBookings` |
+
+### Flutter
+
+1. On connect, listen for `booking:today:cards` and replace the today-card list.
+2. Tick timers locally from `countdownTarget`.
+3. OTP / start / extend still use REST; expect a fresh `booking:today:cards` after success (and from the minute cron).

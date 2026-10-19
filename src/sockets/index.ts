@@ -2,7 +2,12 @@ import { Server as HttpServer } from 'http';
 import { Server } from 'socket.io';
 import prisma from '../config/db';
 import { authenticateSocket } from './auth';
-import { emitInitialCompanionCount, emitInitialHomeBar, setSocketServer } from './bookingEmit';
+import {
+  emitInitialCompanionCount,
+  emitInitialHomeBar,
+  emitInitialTodayCards,
+  setSocketServer,
+} from './bookingEmit';
 import { SOCKET_CLIENT_EVENTS } from './constants';
 import { bookingRoom, companionRoom, userRoom } from './rooms';
 import { registerBookingTrackingHandlers } from './trackingHandlers';
@@ -34,6 +39,7 @@ export function initSockets(httpServer: HttpServer): Server {
     if (companionProfileId != null) {
       socket.join(companionRoom(companionProfileId));
       void emitInitialCompanionCount(companionProfileId);
+      emitInitialTodayCards(userId);
     }
 
     emitInitialHomeBar(userId);
@@ -84,4 +90,6 @@ export {
   emitBookingCoordinationClosed,
   emitBookingCoordinationOpened,
   refreshHomeBarForBooking,
+  refreshTodayCardsForBooking,
+  refreshBookingRealtimeSurfaces,
 } from './bookingEmit';

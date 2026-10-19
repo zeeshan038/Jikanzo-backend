@@ -12,6 +12,7 @@ import {
     uploadGallery,
     UpdateFcm,
     testPushNotification,
+    getUserSelectedActivities,
 } from '../../controllers/user/user';
 import {
     uploadImage,
@@ -36,6 +37,7 @@ router.put('/update-profile', updateProfile);
 router.put('/active-location', setActiveLocation);
 router.get('/saved-locations', getSavedLocations);
 router.get('/whoami', whoami);
+router.get('/activities/:userId', getUserSelectedActivities);
 router.post('/update-fcm', UpdateFcm);
 router.post('/upload-image', upload.single('image'), uploadImage);
 router.post('/upload-video', upload.single('video'), uploadVideo);

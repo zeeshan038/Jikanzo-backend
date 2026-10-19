@@ -2,6 +2,7 @@
 import { Request, Response } from 'express';
 import Stripe from 'stripe';
 import prisma from '../../config/db';
+import { resolveCompanionHourlyRate } from '../../constants/companionPricing';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string)
 
@@ -28,7 +29,7 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
     }
 
     // Calculate amount
-    const hourlyRate = booking.companion.hourlyRate || 0;
+    const hourlyRate = resolveCompanionHourlyRate(booking.companion.hourlyRate);
     const hours = (booking.endTime.getTime() - booking.startTime.getTime()) / (1000 * 60 * 60);
     const amount = Math.round(hours * hourlyRate * 100); // Amount in cents/paise
 

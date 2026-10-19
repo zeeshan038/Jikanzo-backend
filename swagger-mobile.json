@@ -409,9 +409,10 @@
             ]
           },
           "extensionHours": {
-            "type": "integer",
+            "type": "number",
             "nullable": true,
-            "example": null
+            "description": "Hours to extend; 0.5 = 30 minutes",
+            "example": 0.5
           },
           "extensionAmount": {
             "type": "number",
@@ -824,7 +825,8 @@
           "hourlyRate": {
             "type": "number",
             "nullable": true,
-            "example": 50
+            "description": "USD per hour. Defaults to 85 when companion has not set pricing.",
+            "example": 85
           },
           "locationLat": {
             "type": "number",
@@ -3341,7 +3343,7 @@
                       "id": 1,
                       "userId": 42,
                       "bio": "Gallery guide",
-                      "hourlyRate": 40,
+                      "hourlyRate": 85,
                       "isOnline": true,
                       "rating": 5,
                       "trustRank": "New",
@@ -3661,6 +3663,145 @@
         }
       }
     },
+    "/user/activities/{userId}": {
+      "get": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Get companion selected activities",
+        "description": "Returns active activities the companion has selected (for companion profile Activity section and booking activity picker). `userId` is the companion's **user** id (same as feed/specific). `price` falls back to the companion hourly rate (default $85) when activity price is unset. `subActivitiesLabel` is a comma-separated string for list UI.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "example": 42
+            },
+            "description": "Companion's user id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Selected activities fetched successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "msg": {
+                      "type": "string",
+                      "example": "Selected activities fetched successfully"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "example": 1,
+                            "description": "CompanionActivity row id"
+                          },
+                          "activityId": {
+                            "type": "integer",
+                            "example": 3
+                          },
+                          "name": {
+                            "type": "string",
+                            "example": "Fine dining"
+                          },
+                          "description": {
+                            "type": "string",
+                            "nullable": true,
+                            "example": "Upscale restaurants and dinner dates"
+                          },
+                          "image": {
+                            "type": "string",
+                            "nullable": true,
+                            "example": "https://cdn.example.com/activities/fine-dining.jpg"
+                          },
+                          "price": {
+                            "type": "number",
+                            "example": 150,
+                            "description": "USD per hour for this activity"
+                          },
+                          "currency": {
+                            "type": "string",
+                            "example": "USD"
+                          },
+                          "selectedSubActivities": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "example": [
+                              "Coffee meetups",
+                              "Dinner dates",
+                              "Dining",
+                              "Dining club"
+                            ]
+                          },
+                          "subActivitiesLabel": {
+                            "type": "string",
+                            "example": "Coffee meetups, Dinner dates, Dining, Dining club"
+                          },
+                          "isActive": {
+                            "type": "boolean",
+                            "example": true
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid user id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Companion profile not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
     "/api/user/active-location": {
       "$ref": "#/paths/~1user~1active-location"
     },
@@ -5657,7 +5798,7 @@
           "Booking"
         ],
         "summary": "Request booking extension",
-        "description": "Client only. Booking status must be PENDING, ACCEPTED, or ACTIVE. Sets extensionStatus to PENDING; main booking status is unchanged.",
+        "description": "Client only. Booking status must be PENDING, ACCEPTED, or ACTIVE. Sets extensionStatus to PENDING; main booking status is unchanged. `extensionHours` supports 0.5 (30 minutes) and whole hours 1–12. Charge = hourlyRate × extensionHours.",
         "security": [
           {
             "bearerAuth": []
@@ -5685,7 +5826,9 @@
                 "properties": {
                   "extensionHours": {
                     "type": "number",
-                    "minimum": 1
+                    "description": "Extension length in hours. Use 0.5 for 30 minutes, or whole hours 1–12.",
+                    "enum": [0.5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+                    "example": 0.5
                   }
                 }
               }
@@ -7808,7 +7951,7 @@
           "Companion"
         ],
         "summary": "Get dashboard data",
-        "description": "Companion home dashboard. `data.todayBookings` lists sessions whose `startTime` falls on the current calendar day (server local time), with status PENDING, ACCEPTED, ACTIVE, or COMPLETED.",
+        "description": "Companion home dashboard. `data.todayBookings` lists sessions whose `startTime` falls on the current calendar day (server local time), with status ACCEPTED, ACTIVE, or COMPLETED. Each item includes `cardPhase` (STARTS_IN / ENTER_OTP / ENDS_IN / COMPLETED), `countdownTarget`, and `canExtend`. Same list is pushed live on socket event `booking:today:cards` (connect, booking changes, and every minute). OTP code is never included.",
         "security": [
           {
             "bearerAuth": []
@@ -7919,12 +8062,38 @@
                               "status": {
                                 "type": "string",
                                 "enum": [
-                                  "PENDING",
                                   "ACCEPTED",
                                   "ACTIVE",
                                   "COMPLETED"
                                 ],
                                 "example": "ACCEPTED"
+                              },
+                              "otpVerified": {
+                                "type": "boolean",
+                                "example": false
+                              },
+                              "cardPhase": {
+                                "type": "string",
+                                "enum": [
+                                  "STARTS_IN",
+                                  "ENTER_OTP",
+                                  "ENDS_IN",
+                                  "COMPLETED"
+                                ],
+                                "example": "STARTS_IN",
+                                "description": "Companion today-card top-right UI state"
+                              },
+                              "countdownTarget": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true,
+                                "description": "ISO time to count down to for STARTS_IN (startTime) or ENDS_IN (endTime); null for ENTER_OTP / COMPLETED",
+                                "example": "2026-07-23T18:00:00.000Z"
+                              },
+                              "canExtend": {
+                                "type": "boolean",
+                                "example": false,
+                                "description": "Show Extend Booking when true (ACTIVE sessions)"
                               },
                               "clientId": {
                                 "type": "integer",

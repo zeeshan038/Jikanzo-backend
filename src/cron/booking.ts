@@ -16,7 +16,11 @@ import {
   personName,
 } from '../utils/bookingNotifications';
 import { refreshAllActiveHomeBars } from './homeBar';
-import { emitBookingCoordinationClosed, refreshHomeBarForBooking } from '../sockets/bookingEmit';
+import { refreshAllCompanionTodayCards } from './todayCards';
+import {
+  emitBookingCoordinationClosed,
+  refreshBookingRealtimeSurfaces,
+} from '../sockets/bookingEmit';
 import { runCoordinationCronTasks } from './coordination';
 
 /** Match bookings whose startTime is ~N minutes from now (1-minute cron tick). */
@@ -217,8 +221,8 @@ async function autoCompleteActiveBookingsPastEndTime() {
       booking.id,
       'This booking has ended.'
     ).catch((err) => console.error('[CRON] coordination closed:', err));
-    refreshHomeBarForBooking(booking.id).catch((err) =>
-      console.error('[CRON] refreshHomeBarForBooking:', err)
+    refreshBookingRealtimeSurfaces(booking.id).catch((err) =>
+      console.error('[CRON] refreshBookingRealtimeSurfaces:', err)
     );
   }
 
@@ -249,6 +253,12 @@ cron.schedule('* * * * *', async () => {
     await refreshAllActiveHomeBars();
   } catch (error) {
     console.error('[CRON] Error refreshing home booking bars:', error);
+  }
+
+  try {
+    await refreshAllCompanionTodayCards();
+  } catch (error) {
+    console.error('[CRON] Error refreshing companion today cards:', error);
   }
 
   try {

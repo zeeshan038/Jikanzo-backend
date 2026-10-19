@@ -519,3 +519,31 @@ export async function refreshHomeBarForBooking(bookingId: number) {
 export function emitInitialHomeBar(userId: number) {
   void emitHomeBarToUser(userId);
 }
+
+/** Companion-only: push full today-card list (cardPhase + countdownTarget). */
+export async function emitTodayCardsToUser(userId: number) {
+  if (!io) return;
+  const { resolveTodayBookingCardsForUser } = await import('../utils/todayBookingCard');
+  const payload = await resolveTodayBookingCardsForUser(userId);
+  if (!payload) return;
+  io.to(userRoom(userId)).emit(SOCKET_EVENTS.TODAY_CARDS, payload);
+}
+
+export async function refreshTodayCardsForBooking(bookingId: number) {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    select: { companion: { select: { userId: true } } },
+  });
+  if (!booking?.companion.userId) return;
+  await emitTodayCardsToUser(booking.companion.userId);
+}
+
+/** Home bar (both roles) + companion today cards after booking mutations. */
+export async function refreshBookingRealtimeSurfaces(bookingId: number) {
+  await refreshHomeBarForBooking(bookingId);
+  await refreshTodayCardsForBooking(bookingId);
+}
+
+export function emitInitialTodayCards(userId: number) {
+  void emitTodayCardsToUser(userId);
+}

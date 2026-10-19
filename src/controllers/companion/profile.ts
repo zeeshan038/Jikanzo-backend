@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../../config/db';
+import { DEFAULT_COMPANION_HOURLY_RATE } from '../../constants/companionPricing';
 
 
 /**
@@ -37,6 +38,7 @@ export const becomeCompanion = async (req: Request, res: Response): Promise<void
       await tx.companionProfile.create({
         data: {
           userId,
+          hourlyRate: DEFAULT_COMPANION_HOURLY_RATE,
         },
       });
 

@@ -17,7 +17,7 @@ export const acceptBooking = Joi.object({
 
 export const cancelBookingSchema = Joi.object({
   reasonCode: Joi.string().required(),
-  reasonText: Joi.string().max(500).optional().allow(''),
+  reasonText: Joi.string().max(500).optional().allow('', null),
 });
 
 export const rescheduleBookingSchema = Joi.object({
@@ -32,4 +32,11 @@ export const rescheduleBookingSchema = Joi.object({
 
 export const verifyBookingOtpSchema = Joi.object({
   otp: Joi.string().length(4).required(),
+});
+
+/** 0.5 = 30 minutes; then whole hours 1–12 (matches Extend Booking picker). */
+export const requestExtensionSchema = Joi.object({
+  extensionHours: Joi.number()
+    .valid(0.5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)
+    .required(),
 });

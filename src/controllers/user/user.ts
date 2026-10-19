@@ -22,6 +22,10 @@ import {
     generateUniqueCloudflareId,
     ensureR2UserFolders
 } from '../../utils/cloudflare';
+import {
+    DEFAULT_COMPANION_HOURLY_RATE,
+    resolveCompanionHourlyRate,
+} from '../../constants/companionPricing';
 import { sendPushNotification } from '../../utils/notification';
 import { getMessaging } from 'firebase-admin/messaging';
 import {
@@ -252,7 +256,7 @@ export const registerUser = async (req: Request, res: Response): Promise<any> =>
 
         if (role === 'COMPANION' || role === 'BOTH') {
             userData.companionProfile = {
-                create: {}
+                create: { hourlyRate: DEFAULT_COMPANION_HOURLY_RATE }
             };
         }
 
@@ -956,3 +960,79 @@ export const testPushNotification = async (req: Request, res: Response): Promise
 };
 
 
+
+
+/**
+ * @Description Get a companion's selected activities (for companion profile / booking activity picker)
+ * @Method GET api/user/activities/:userId
+ * @Access Private
+ */
+export const getUserSelectedActivities = async (req: Request, res: Response): Promise<any> => {
+    const targetUserId = parseInt(req.params.userId, 10);
+
+    if (Number.isNaN(targetUserId)) {
+        return res.status(400).json({
+            status: false,
+            msg: 'Invalid user id',
+        });
+    }
+
+    try {
+        const companionProfile = await prisma.companionProfile.findUnique({
+            where: { userId: targetUserId },
+            select: {
+                id: true,
+                hourlyRate: true,
+                activities: {
+                    where: { isActive: true },
+                    include: {
+                        activity: true,
+                    },
+                    orderBy: { id: 'asc' },
+                },
+            },
+        });
+
+        if (!companionProfile) {
+            return res.status(404).json({
+                status: false,
+                msg: 'Companion profile not found for this user',
+            });
+        }
+
+        const fallbackRate = resolveCompanionHourlyRate(companionProfile.hourlyRate);
+
+        const data = companionProfile.activities
+            .filter((row) => row.activity && row.activity.isActive)
+            .map((row) => {
+                const selectedSubActivities = row.selectedSubActivities ?? [];
+                const price =
+                    row.price != null && row.price > 0 ? row.price : fallbackRate;
+
+                return {
+                    id: row.id,
+                    activityId: row.activityId,
+                    name: row.activity.name,
+                    description: row.activity.description,
+                    image: row.activity.image,
+                    price,
+                    currency: 'USD',
+                    selectedSubActivities,
+                    /** Comma-separated sub-activities for profile Activity rows */
+                    subActivitiesLabel: selectedSubActivities.join(', '),
+                    isActive: row.isActive,
+                };
+            });
+
+        return res.status(200).json({
+            status: true,
+            msg: 'Selected activities fetched successfully',
+            data,
+        });
+    } catch (error: any) {
+        return res.status(500).json({
+            status: false,
+            msg: error.message || 'Internal server error',
+        });
+    }
+};

@@ -1,11 +1,42 @@
 import { Booking, CompanionProfile, User } from '@prisma/client';
+import { resolveCompanionHourlyRate } from '../constants/companionPricing';
 import { calculatePaymentBreakdown, getStoredOrComputedBreakdown } from './bookingFinance';
 
 export const BOOKING_REQUEST_EXPIRY_MS = 30 * 60 * 1000;
 
+/** UI picker: 30 minutes + whole hours 1–12. */
+export const ALLOWED_EXTENSION_HOURS = [0.5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
+
 export const bookingDurationHours = (startTime: Date, endTime: Date): number => {
   const durationMs = endTime.getTime() - startTime.getTime();
   return durationMs > 0 ? Math.round((durationMs / (1000 * 60 * 60)) * 100) / 100 : 0;
+};
+
+/** Normalize and validate extension length (0.5 = 30 minutes). */
+export const parseExtensionHours = (raw: unknown): number | null => {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return null;
+  const match = ALLOWED_EXTENSION_HOURS.find((h) => Math.abs(h - n) < 1e-9);
+  return match ?? null;
+};
+
+export const formatExtensionDuration = (hours: number): string => {
+  if (Math.abs(hours - 0.5) < 1e-9) return '30 minutes';
+  if (hours === 1) return '1 hour';
+  if (Number.isInteger(hours)) return `${hours} hours`;
+  const minutes = Math.round(hours * 60);
+  if (minutes % 60 === 0) {
+    const h = minutes / 60;
+    return h === 1 ? '1 hour' : `${h} hours`;
+  }
+  if (minutes < 60) return `${minutes} minutes`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${h} hour${h === 1 ? '' : 's'} ${m} minutes`;
+};
+
+export const addExtensionToEndTime = (endTime: Date, extensionHours: number): Date => {
+  return new Date(endTime.getTime() + extensionHours * 60 * 60 * 1000);
 };
 
 export const normalizeBookingListType = (type: unknown): string | undefined => {
@@ -24,7 +55,7 @@ type BookingWithRelations = Booking & {
 export const buildCompanionPublicProfile = (booking: BookingWithRelations) => ({
   id: booking.companion.id,
   bio: booking.companion.bio,
-  hourlyRate: booking.companion.hourlyRate,
+  hourlyRate: resolveCompanionHourlyRate(booking.companion.hourlyRate),
   rating: booking.companion.rating,
   trustRank: booking.companion.trustRank,
   totalSessions: booking.companion.totalSessions,
@@ -71,7 +102,7 @@ export const buildClientSummary = (booking: BookingWithRelations) => ({
 export const buildPaymentSummary = (booking: BookingWithRelations) => {
   const breakdown = getStoredOrComputedBreakdown(booking);
   const durationHours = bookingDurationHours(booking.startTime, booking.endTime);
-  const hourlyRate = booking.companion.hourlyRate ?? 0;
+  const hourlyRate = resolveCompanionHourlyRate(booking.companion.hourlyRate);
   const expectedEarnings = breakdown.companionNetAmount;
 
   return {

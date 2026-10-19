@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prismaClient from '../../config/db';
+import { resolveCompanionHourlyRate } from '../../constants/companionPricing';
 import {
     discoveryLocationForCompanion,
     haversineDistanceKm,
@@ -85,6 +86,7 @@ export const discoverPeople = async (req: Request, res: Response) => {
 
                 return {
                     ...companion,
+                    hourlyRate: resolveCompanionHourlyRate(companion.hourlyRate),
                     locationLat: activePin.lat,
                     locationLng: activePin.lng,
                     activeLocation: activePin,

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../../config/db';
 import { activeMomentsWhere } from '../../constants/moments';
+import { resolveTodayBookingCardsForCompanion } from '../../utils/todayBookingCard';
 
 
 /**
@@ -29,6 +30,7 @@ export const getDashboardData = async (req: Request, res: Response): Promise<voi
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
+    const now = new Date();
 
     // 1. Fetch pending bookings (Booking Requests)
     const newRequests = await prisma.booking.findMany({
@@ -50,31 +52,11 @@ export const getDashboardData = async (req: Request, res: Response): Promise<voi
       }
     });
 
-    // 2. Today's schedule — only confirmed sessions (not PENDING requests)
-    const todayBookings = await prisma.booking.findMany({
-      where: {
-        companionId: profile.id,
-        startTime: {
-          gte: today,
-          lt: tomorrow,
-        },
-        status: {
-          in: ['ACCEPTED', 'ACTIVE', 'COMPLETED'],
-        },
-      },
-      orderBy: {
-        startTime: 'asc',
-      },
-      include: {
-        client: {
-          select: {
-            id: true,
-            username: true,
-            profileImage: true,
-          }
-        }
-      }
-    });
+    // 2. Today's schedule — same shape as socket `booking:today:cards` (no OTP code)
+    const { bookings: todayBookings } = await resolveTodayBookingCardsForCompanion(
+      profile.id,
+      now
+    );
 
     // 3. Active bookings count (all active bookings not just today, or maybe just today depending on UI, let's just do all active)
     const activeBookingsCount = await prisma.booking.count({
@@ -136,8 +118,6 @@ export const getDashboardData = async (req: Request, res: Response): Promise<voi
     if (profile.totalSessions > 0) {
       repeatRate = Math.round((profile.repeatClients / profile.totalSessions) * 100);
     }
-
-    const now = new Date();
 
     // 7. Moments: posted stories + appreciation totals (likes, rings, diamonds, views)
     const [momentTotals, activeMomentsCount, totalMomentViews, activeMoments] = await Promise.all([
